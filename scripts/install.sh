@@ -13,7 +13,7 @@ BLUE='\033[0;34m'
 NC='\033[0m' # No Color
 
 # Repository configuration
-REPO_OWNER="adstertech"
+REPO_OWNER="adster-tech"
 REPO_NAME="adster-sdk-agents"
 BRANCH="main"
 BASE_URL="https://raw.githubusercontent.com/${REPO_OWNER}/${REPO_NAME}/${BRANCH}"

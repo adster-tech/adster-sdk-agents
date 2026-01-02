@@ -7,7 +7,7 @@ AI-powered Android SDK integration agents for Claude Code. Integrate Adster Cust
 Install Adster agents with one command:
 
 ```bash
-bash <(curl -fsSL https://raw.githubusercontent.com/adstertech/adster-sdk-agents/main/scripts/install.sh)
+bash <(curl -fsSL https://raw.githubusercontent.com/adster-tech/adster-sdk-agents/main/scripts/install.sh)
 ```
 
 Then in your Android project:
@@ -52,7 +52,7 @@ This repository provides Claude Code agents that automate Adster SDK integration
 Install agents globally for all your projects:
 
 ```bash
-bash <(curl -fsSL https://raw.githubusercontent.com/adstertech/adster-sdk-agents/main/scripts/install.sh)
+bash <(curl -fsSL https://raw.githubusercontent.com/adster-tech/adster-sdk-agents/main/scripts/install.sh)
 ```
 
 ### Option 2: Local Project Install
@@ -60,7 +60,7 @@ bash <(curl -fsSL https://raw.githubusercontent.com/adstertech/adster-sdk-agents
 Install agents only for the current project:
 
 ```bash
-bash <(curl -fsSL https://raw.githubusercontent.com/adstertech/adster-sdk-agents/main/scripts/install.sh) --local
+bash <(curl -fsSL https://raw.githubusercontent.com/adster-tech/adster-sdk-agents/main/scripts/install.sh) --local
 ```
 
 ### Option 3: Manual Install
@@ -68,7 +68,7 @@ bash <(curl -fsSL https://raw.githubusercontent.com/adstertech/adster-sdk-agents
 Clone and explore the repository:
 
 ```bash
-git clone https://github.com/adstertech/adster-sdk-agents.git
+git clone https://github.com/adster-tech/adster-sdk-agents.git
 cd adster-sdk-agents
 
 # Copy agents to Claude Code directory
@@ -168,7 +168,7 @@ The Direct SDK agent automatically:
 
 1. **Install agents** (one time):
    ```bash
-   bash <(curl -fsSL https://raw.githubusercontent.com/adstertech/adster-sdk-agents/main/scripts/install.sh)
+   bash <(curl -fsSL https://raw.githubusercontent.com/adster-tech/adster-sdk-agents/main/scripts/install.sh)
    ```
 
 2. **Navigate to your Android project**:
@@ -223,7 +223,7 @@ If Claude Code doesn't recognize the agents:
 
 2. **Reinstall agents**:
    ```bash
-   bash <(curl -fsSL https://raw.githubusercontent.com/adstertech/adster-sdk-agents/main/scripts/install.sh)
+   bash <(curl -fsSL https://raw.githubusercontent.com/adster-tech/adster-sdk-agents/main/scripts/install.sh)
    ```
 
 3. **Restart Claude Code**
@@ -296,7 +296,7 @@ MIT License - see [LICENSE](LICENSE) file for details
 
 ## Support
 
-- **Issues**: https://github.com/adstertech/adster-sdk-agents/issues
+- **Issues**: https://github.com/adster-tech/adster-sdk-agents/issues
 - **Email**: support@adster.tech
 - **Documentation**: https://ca-docs.adster.tech/
 

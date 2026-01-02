@@ -1,0 +1,8 @@
+{
+  "mcpServers": {
+    "adster-android-integrator": {
+      "command": "node",
+      "args": ["/ABSOLUTE/PATH/TO/adster-mcp-server/dist/index.js"]
+    }
+  }
+}

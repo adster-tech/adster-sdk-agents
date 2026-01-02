@@ -1,0 +1,24 @@
+# Node modules
+node_modules/
+
+# Build output
+dist/
+
+# Local Claude Code settings (don't commit)
+# Agent files in .claude/agents/ SHOULD be committed
+.claude/settings.local.json
+.claude/settings.json
+.claude/*.json
+
+# System files
+.DS_Store
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# Logs
+*.log
+npm-debug.log*

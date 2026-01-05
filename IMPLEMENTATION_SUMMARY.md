@@ -157,8 +157,8 @@
   - And more...
 
 ### 17. **API Changes** ✅
-- **Removed**: `ADSTER_API_KEY` concept (not needed)
-- **Changed**: Zone IDs removed for Custom Adapter
+- **Removed**: `ADSTER_API_KEY` concept (completely removed for all SDKs)
+- **Changed**: Zone IDs replaced with Placement IDs
 - **Added**: Placement ID support for Orchestration SDK
 - **Implementation**: Updated throughout codebase
 

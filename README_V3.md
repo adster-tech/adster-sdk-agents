@@ -27,9 +27,9 @@ AI-powered Android SDK integration agents for Claude Code. Integrate Adster Cust
 - ✅ **Validation Improvements**: Deep validation of integration quality
 
 ### 🔧 API Changes
-- ❌ Removed `ADSTER_API_KEY` concept (not needed for Custom Adapter)
+- ❌ Removed `ADSTER_API_KEY` concept (not needed for any integration)
 - ✅ Added placement ID support for Orchestration SDK
-- ✅ Simplified dashboard configuration (no zone IDs for Custom Adapter)
+- ✅ Simplified dashboard configuration (Placement IDs everywhere)
 
 ## Quick Start
 

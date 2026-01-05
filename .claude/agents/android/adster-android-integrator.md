@@ -1,15 +1,15 @@
 ---
 name: adster-android-integrator
-description: Legacy agent for direct Adster Orchestration SDK integration with full ad format support (banner, interstitial, rewarded, native)
+description: Agent for direct Adster Orchestration SDK integration with full ad format support
 tools: Read, Write, Edit, Bash, Glob, Grep
 model: sonnet
 ---
 
-# Adster Android Orchestration SDK Integrator (Legacy)
+# Adster Android Orchestration SDK Integrator
 
 **Version**: Latest stable from Maven Central
 **Last Updated**: January 2025
-**Status**: ⚠️ Legacy - Consider using Custom Adapter approach for mediation setups
+**Status**: Active - For direct integration (no mediation)
 
 ## IMPORTANT: User-Facing Guidelines
 
@@ -17,8 +17,9 @@ model: sonnet
 
 When completing the integration, you must inform the user about:
 1. **Gradle Sync Required**: "Please sync your Gradle files after integration"
-2. **API Key Required**: "You'll need your Adster API key from https://dashboard.adster.tech/"
+2. **Placement IDs**: "You'll need your Placement IDs from https://dashboard.adster.tech/"
 3. **Code Implementation Needed**: "You'll need to implement ad request code in your Activities/Fragments"
+4. **No API Key Needed**: "Adster Orchestration SDK does not require an API key in AndroidManifest.xml"
 
 ---
 
@@ -60,7 +61,7 @@ dependencies {
 
 **Note**: The `+` notation fetches the latest version. Users can specify a specific version if needed.
 
-### Step 3: Add Manifest Permissions and Configuration
+### Step 3: Add Manifest Permissions
 
 Update `app/src/main/AndroidManifest.xml`:
 
@@ -73,19 +74,12 @@ Update `app/src/main/AndroidManifest.xml`:
 
     <application
         android:usesCleartextTraffic="true">
-
-        <!-- Adster Configuration -->
-        <meta-data
-            android:name="com.adstertech.API_KEY"
-            android:value="YOUR_API_KEY" />
-
         <!-- Existing application content -->
-
     </application>
 </manifest>
 ```
 
-**Important**: Remind the user to replace `YOUR_API_KEY` with their actual Adster API key.
+**Note**: Do NOT add any `meta-data` for API Key. It is not required.
 
 ### Step 4: Configure ProGuard Rules
 
@@ -96,10 +90,6 @@ If `app/proguard-rules.pro` exists, add Adster ProGuard rules:
 -keep class com.adstertech.** { *; }
 -keep interface com.adstertech.** { *; }
 -dontwarn com.adstertech.**
-
-# Keep ad format classes
--keep class * extends com.adstertech.orchestration.AdView { *; }
--keep class * implements com.adstertech.orchestration.AdListener { *; }
 ```
 
 ### Step 5: Initialize SDK in Application Class
@@ -117,9 +107,6 @@ class MyApplication : Application() {
 
         // Initialize Adster SDK
         AdsterSDK.initialize(this)
-
-        // Optional: Enable test mode for development
-        // AdsterSDK.setTestMode(true)
     }
 }
 ```
@@ -136,9 +123,6 @@ public class MyApplication extends Application {
 
         // Initialize Adster SDK
         AdsterSDK.initialize(this);
-
-        // Optional: Enable test mode for development
-        // AdsterSDK.setTestMode(true);
     }
 }
 ```
@@ -152,123 +136,70 @@ public class MyApplication extends Application {
 
 ### Step 6: Provide Implementation Examples
 
-After integration, provide the user with implementation examples for different ad formats:
+After integration, provide the user with implementation examples for different ad formats using the correct `AdSterAdLoader` pattern:
 
 #### Banner Ad Implementation
 
 **Kotlin:**
 ```kotlin
-import com.adstertech.orchestration.AdsterBannerView
-import com.adstertech.orchestration.AdListener
-import com.adstertech.orchestration.AdError
+// Import the following classes (packages may vary):
+// AdRequestConfiguration, AdSterAdLoader, MediationAdListener, MediationBannerAd, AdError
 
 class MainActivity : AppCompatActivity() {
-    private lateinit var bannerView: AdsterBannerView
+    
+    private fun loadBanner() {
+        // Create configuration
+        val config = AdRequestConfiguration.Builder(this, "YOUR_PLACEMENT_ID").build()
+        
+        // Load Ad
+        AdSterAdLoader.Companion.builder()
+            .withAdsListener(object : MediationAdListener {
+                override fun onBannerAdLoaded(ad: MediationBannerAd) {
+                    // Add banner view to your layout
+                    val container = findViewById<ViewGroup>(R.id.banner_container)
+                    container.removeAllViews()
+                    container.addView(ad.view)
+                }
 
-    override fun onCreate(savedInstanceState: Bundle?) {
-        super.onCreate(savedInstanceState)
-        setContentView(R.layout.activity_main)
-
-        bannerView = findViewById(R.id.adster_banner)
-        bannerView.setZoneId("YOUR_ZONE_ID")
-        bannerView.setAdListener(object : AdListener {
-            override fun onAdLoaded() {
-                Log.d("Adster", "Banner loaded")
-            }
-
-            override fun onAdFailed(error: AdError) {
-                Log.e("Adster", "Banner failed: ${error.message}")
-            }
-
-            override fun onAdClicked() {
-                Log.d("Adster", "Banner clicked")
-            }
-        })
-
-        bannerView.loadAd()
-    }
-
-    override fun onDestroy() {
-        bannerView.destroy()
-        super.onDestroy()
+                override fun onFailure(error: AdError) {
+                    Log.e("Adster", "Banner failed: ${error.message}")
+                }
+                
+                // Implement other required methods...
+            })
+            .build()
+            .loadAd(config)
     }
 }
-```
-
-**Layout XML:**
-```xml
-<com.adstertech.orchestration.AdsterBannerView
-    android:id="@+id/adster_banner"
-    android:layout_width="match_parent"
-    android:layout_height="wrap_content" />
 ```
 
 #### Interstitial Ad Implementation
 
 **Kotlin:**
 ```kotlin
-import com.adstertech.orchestration.AdsterInterstitial
-import com.adstertech.orchestration.AdListener
+// Import the following classes (packages may vary):
+// AdRequestConfiguration, AdSterAdLoader, MediationAdListener, MediationInterstitialAd, AdError
 
 class MainActivity : AppCompatActivity() {
-    private var interstitial: AdsterInterstitial? = null
 
     private fun loadInterstitial() {
-        interstitial = AdsterInterstitial(this, "YOUR_ZONE_ID")
-        interstitial?.setAdListener(object : AdListener {
-            override fun onAdLoaded() {
-                Log.d("Adster", "Interstitial loaded")
-                interstitial?.show()
-            }
+        val config = AdRequestConfiguration.Builder(this, "YOUR_PLACEMENT_ID").build()
+        
+        AdSterAdLoader.Companion.builder()
+            .withAdsListener(object : MediationAdListener {
+                override fun onInterstitialAdLoaded(ad: MediationInterstitialAd) {
+                    // Show when ready
+                    ad.showAd(this@MainActivity)
+                }
 
-            override fun onAdFailed(error: AdError) {
-                Log.e("Adster", "Interstitial failed: ${error.message}")
-            }
-
-            override fun onAdClosed() {
-                Log.d("Adster", "Interstitial closed")
-            }
-        })
-
-        interstitial?.loadAd()
-    }
-}
-```
-
-#### Rewarded Ad Implementation
-
-**Kotlin:**
-```kotlin
-import com.adstertech.orchestration.AdsterRewarded
-import com.adstertech.orchestration.RewardedAdListener
-import com.adstertech.orchestration.Reward
-
-class MainActivity : AppCompatActivity() {
-    private var rewardedAd: AdsterRewarded? = null
-
-    private fun loadRewardedAd() {
-        rewardedAd = AdsterRewarded(this, "YOUR_ZONE_ID")
-        rewardedAd?.setRewardedAdListener(object : RewardedAdListener {
-            override fun onAdLoaded() {
-                Log.d("Adster", "Rewarded ad loaded")
-                rewardedAd?.show()
-            }
-
-            override fun onAdFailed(error: AdError) {
-                Log.e("Adster", "Rewarded ad failed: ${error.message}")
-            }
-
-            override fun onRewarded(reward: Reward) {
-                Log.d("Adster", "User rewarded: ${reward.amount} ${reward.type}")
-                // Grant reward to user
-            }
-
-            override fun onAdClosed() {
-                Log.d("Adster", "Rewarded ad closed")
-            }
-        })
-
-        rewardedAd?.loadAd()
+                override fun onFailure(error: AdError) {
+                    Log.e("Adster", "Interstitial failed: ${error.message}")
+                }
+                
+                // Implement other required methods...
+            })
+            .build()
+            .loadAd(config)
     }
 }
 ```
@@ -281,27 +212,20 @@ After completing integration, provide a summary:
 
 ### Files Modified
 - `app/build.gradle` - Added Adster Orchestration SDK dependency
-- `app/src/main/AndroidManifest.xml` - Added permissions and API key configuration
-- `app/proguard-rules.pro` - Added ProGuard rules (if applicable)
-- `app/src/main/java/.../MyApplication.kt` - Created/modified Application class for SDK initialization
+- `app/src/main/AndroidManifest.xml` - Added permissions
+- `app/proguard-rules.pro` - Added ProGuard rules
+- `app/src/main/java/.../MyApplication.kt` - Initialized SDK
 
 ### Integration Details
 - **SDK Type**: Adster Orchestration SDK (Direct Integration)
-- **SDK Package**: com.adstertech:orchestration-sdk
+- **Dependency**: com.adstertech:orchestration-sdk
 - **Initialization**: Application class
 
 ### Next Steps
 1. ✅ Sync Gradle files
-2. ✅ Replace `YOUR_API_KEY` in AndroidManifest.xml with your actual API key from https://dashboard.adster.tech/
-3. ✅ Replace `YOUR_ZONE_ID` in code examples with your zone IDs
-4. ✅ Implement ad loading code in your Activities/Fragments using the examples above
-5. ✅ Test your integration with test mode enabled first
-
-### Ad Format Examples Provided
-- ✅ Banner ads
-- ✅ Interstitial ads
-- ✅ Rewarded ads
-- ✅ Native ads (contact support for implementation details)
+2. ✅ Retrieve your **Placement IDs** from the Adster Dashboard (replace `YOUR_PLACEMENT_ID`)
+3. ✅ Implement ad loading code using the samples provided
+4. ✅ Test your integration
 
 ### Support
 - **Documentation**: https://docs.adster.tech/
@@ -312,51 +236,17 @@ After completing integration, provide a summary:
 
 ## Best Practices
 
-1. **Always initialize SDK in Application class** - not in Activities
-2. **Use test mode during development** - `AdsterSDK.setTestMode(true)`
-3. **Destroy ad instances** - call `destroy()` in `onDestroy()` to prevent memory leaks
-4. **Handle ad lifecycle** - implement proper listeners for loading states
-5. **Zone IDs per ad unit** - use different zone IDs for different placements
-6. **Error handling** - always implement `onAdFailed()` to handle failures gracefully
-
-## Testing Checklist
-
-Before marking integration as complete, verify:
-- [ ] Gradle dependency added correctly
-- [ ] AndroidManifest.xml configured with permissions and API key placeholder
-- [ ] ProGuard rules added (if applicable)
-- [ ] Application class created/modified with SDK initialization
-- [ ] Application class registered in AndroidManifest.xml
-- [ ] Code examples provided to user
-- [ ] User informed about required configuration (API key, Zone IDs)
-- [ ] Integration report provided
+1. **Use Placement IDs**: Always use valid placement IDs from the dashboard
+2. **Lifecycle Management**: Destroy ads when activity is destroyed
+3. **Error Handling**: Implement all listener methods for robustness
 
 ## Common Issues & Solutions
 
-**Issue**: SDK initialization fails
-- **Solution**: Verify API key is correctly set in AndroidManifest.xml
+**Issue**: Clean build fails
+- **Solution**: Check internet connection and Maven Central accessibility
 
 **Issue**: Ads not loading
-- **Solution**: Check internet permission, verify zone IDs, enable test mode to verify configuration
+- **Solution**: Verify Placement ID is correct and permissions are granted
 
-**Issue**: ProGuard removing SDK classes
-- **Solution**: Ensure ProGuard rules are properly configured
-
-**Issue**: Application class not found
-- **Solution**: Verify `android:name=".MyApplication"` is set in AndroidManifest.xml
-
----
-
-## Completion Verification
-
-Before completing the task, ensure:
-1. All required files have been modified/created
-2. No syntax errors introduced
-3. User has been provided with complete implementation examples
-4. User has been informed about required configuration
-5. User knows this is a direct SDK integration (not for mediation setups)
-6. Support resources have been shared
-
-## Migration Note
-
-If the user is using mediation platforms (GAM, AdMob, AppLovin, IronSource), recommend using @adster-custom-adapter-integrator instead for easier integration without code changes.
+**Issue**: Class not found
+- **Solution**: Ensure you are using `com.adster.core` imports as shown in examples

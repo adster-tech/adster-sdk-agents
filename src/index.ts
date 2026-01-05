@@ -750,6 +750,12 @@ class AdsterIntegrationServer {
       modified = true;
     }
 
+    // Cleanup legacy API Key if present
+    if (manifest.removeMetaData("com.adstertech.API_KEY")) {
+      logger.success("🗑️ Removed legacy API Key meta-data");
+      modified = true;
+    }
+
     if (modified) {
       await manifest.save(manifestPath);
     } else {
@@ -901,6 +907,7 @@ class AdsterIntegrationServer {
    • Interstitial: com.adstertech.customadapter.AdsterCustomEventInterstitial
    • Rewarded: com.adstertech.customadapter.AdsterCustomEventRewarded
    • Native: com.adstertech.customadapter.AdsterCustomEventNative
+4. **Parameter**: Enter your Adster Placement ID
 
 📚 Full documentation: https://ca-docs.adster.tech/google-ad-manager
 `,
@@ -913,6 +920,7 @@ class AdsterIntegrationServer {
    • Interstitial: com.adstertech.customadapter.AdsterCustomEventInterstitial
    • Rewarded: com.adstertech.customadapter.AdsterCustomEventRewarded
    • Native: com.adstertech.customadapter.AdsterCustomEventNative
+4. **Parameter**: Enter your Adster Placement ID
 
 📚 Full documentation: https://ca-docs.adster.tech/admob
 `,
@@ -923,7 +931,7 @@ class AdsterIntegrationServer {
 3. Configure:
    • Network Name: Adster
    • Android Adapter Class: com.adstertech.customadapter.applovin.AdsterMediationAdapter
-4. Add to your ad unit waterfalls
+4. Add to your ad unit waterfalls (use Placement ID if requested)
 
 📚 Full documentation: https://ca-docs.adster.tech/applovin
 `,
@@ -935,6 +943,7 @@ class AdsterIntegrationServer {
    • Banner: com.adstertech.customadapter.ironsource.AdsterCustomBanner
    • Interstitial: com.adstertech.customadapter.ironsource.AdsterCustomInterstitial
    • Rewarded: com.adstertech.customadapter.ironsource.AdsterCustomRewardedVideo
+4. **Parameter**: Enter your Adster Placement ID
 
 📚 Full documentation: https://ca-docs.adster.tech/ironsource
 `,

@@ -110,7 +110,7 @@ After completing the file modifications, provide the user with platform-specific
    - **Rewarded**: `com.adstertech.customadapter.AdsterCustomEventRewarded`
    - **Native**: `com.adstertech.customadapter.AdsterCustomEventNative`
 
-3. **Set Parameter**: Add your Adster Zone ID in the parameter field
+3. **Set Parameter**: Add your Adster Placement ID in the parameter field
 
 4. **Full documentation**: https://ca-docs.adster.tech/google-ad-manager
 
@@ -126,7 +126,7 @@ After completing the file modifications, provide the user with platform-specific
    - **Rewarded**: `com.adstertech.customadapter.AdsterCustomEventRewarded`
    - **Native**: `com.adstertech.customadapter.AdsterCustomEventNative`
 
-3. **Set Parameter**: Add your Adster Zone ID in the parameter field
+3. **Set Parameter**: Add your Adster Placement ID in the parameter field
 
 4. **Full documentation**: https://ca-docs.adster.tech/admob
 
@@ -155,7 +155,7 @@ After completing the file modifications, provide the user with platform-specific
    - **Interstitial**: `com.adstertech.customadapter.ironsource.AdsterCustomInterstitial`
    - **Rewarded**: `com.adstertech.customadapter.ironsource.AdsterCustomRewardedVideo`
 
-3. **Set Instance Parameters**: Add your Adster Zone ID
+3. **Set Instance Parameters**: Add your Adster Placement ID
 
 4. **Full documentation**: https://ca-docs.adster.tech/ironsource
 
@@ -215,8 +215,8 @@ Before marking integration as complete, verify:
 **Issue**: ProGuard rules file doesn't exist
 - **Solution**: Create the file only if the project uses minifyEnabled true in build.gradle
 
-**Issue**: User doesn't know their Adster Zone ID
-- **Solution**: Direct them to https://dashboard.adster.tech/ to retrieve their zone IDs
+**Issue**: User doesn't know their Adster Placement ID
+- **Solution**: Direct them to https://dashboard.adster.tech/ to retrieve their placement IDs
 
 ---
 

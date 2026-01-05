@@ -52,13 +52,20 @@ while [[ $# -gt 0 ]]; do
             NON_INTERACTIVE=true
             shift
             ;;
+        --source=*)
+            INSTALL_SOURCE="${1#*=}"
+            shift
+            ;;
         *)
             echo -e "${RED}Unknown option: $1${NC}"
-            echo "Usage: $0 [--global|--local] [--platform=android|all] [--branch=main] [--non-interactive]"
+            echo "Usage: $0 [--global|--local] [--source=remote|local] [--platform=android|all] [--branch=main]"
             exit 1
             ;;
     esac
 done
+
+# Default to remote if not specified
+INSTALL_SOURCE=${INSTALL_SOURCE:-remote}
 
 echo -e "${BLUE}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
 echo -e "${GREEN}   Adster SDK Agents Installer for Claude Code${NC}"
@@ -69,13 +76,15 @@ echo ""
 echo -e "${YELLOW}Checking prerequisites...${NC}"
 echo ""
 
-# Check for curl
-if ! command -v curl &> /dev/null; then
-    echo -e "${RED}❌ curl is not installed${NC}"
-    echo "Please install curl and try again"
-    exit 1
+# Check for curl (only if remote)
+if [ "$INSTALL_SOURCE" = "remote" ]; then
+    if ! command -v curl &> /dev/null; then
+        echo -e "${RED}❌ curl is not installed${NC}"
+        echo "Please install curl and try again"
+        exit 1
+    fi
+    echo -e "${GREEN}✓${NC} curl is available"
 fi
-echo -e "${GREEN}✓${NC} curl is available"
 
 # Check for Claude Code
 CLAUDE_INSTALLED=false
@@ -101,7 +110,8 @@ else
     echo -e "${BLUE}Installation scope:${NC} Local project (${INSTALL_DIR})"
 fi
 
-echo -e "${BLUE}Platform:${NC} ${PLATFORM}"
+echo -e "${BLUE}Install source:${NC}     ${INSTALL_SOURCE}"
+echo -e "${BLUE}Platform:${NC}           ${PLATFORM}"
 echo ""
 
 # Define agents based on platform
@@ -130,20 +140,34 @@ echo ""
 INSTALLED_COUNT=0
 FAILED_COUNT=0
 
+REPO_ROOT=$(pwd)
+
 for agent in "${AGENTS[@]}"; do
     agent_name=$(basename "$agent")
     platform_dir=$(dirname "$agent")
-    url="${BASE_URL}/.claude/agents/${agent}"
     dest="${INSTALL_DIR}/${agent}"
-
+    
     echo -n "  Installing ${agent_name}... "
 
-    if curl -fsSL "$url" -o "$dest" 2>/dev/null; then
-        echo -e "${GREEN}✓${NC}"
-        ((INSTALLED_COUNT++))
+    if [ "$INSTALL_SOURCE" = "local" ]; then
+        local_src="${REPO_ROOT}/.claude/agents/${agent}"
+        if [ -f "$local_src" ]; then
+            cp "$local_src" "$dest"
+            echo -e "${GREEN}✓ (local)${NC}"
+            ((INSTALLED_COUNT++))
+        else
+            echo -e "${RED}✗ (file not found: $local_src)${NC}"
+            ((FAILED_COUNT++))
+        fi
     else
-        echo -e "${RED}✗${NC}"
-        ((FAILED_COUNT++))
+        url="${BASE_URL}/.claude/agents/${agent}"
+        if curl -fsSL "$url" -o "$dest" 2>/dev/null; then
+            echo -e "${GREEN}✓${NC}"
+            ((INSTALLED_COUNT++))
+        else
+            echo -e "${RED}✗ (download failed)${NC}"
+            ((FAILED_COUNT++))
+        fi
     fi
 done
 

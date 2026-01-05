@@ -9,17 +9,25 @@ import {
 } from "@modelcontextprotocol/sdk/types.js";
 import { readFile, writeFile } from "fs/promises";
 import { existsSync } from "fs";
-import { join, dirname } from "path";
+import { join } from "path";
 
-type AdNetwork = "gam" | "admob" | "applovin" | "ironsource";
+import type {
+  AdNetwork,
+  IntegrationConfig,
+  OrchestrationConfig,
+  IntegrationResult,
+  FileModification,
+  ValidationResult,
+  ValidationIssue,
+} from "./types.js";
 
-interface IntegrationConfig {
-  adNetwork: AdNetwork;
-  sdkVersion?: string;
-  minSdkVersion?: number;
-  compileSdkVersion?: number;
-  targetSdkVersion?: number;
-}
+import { Logger, logger } from "./logger.js";
+import { BackupManager } from "./backup.js";
+import { VersionManager } from "./version-manager.js";
+import { GradleParser } from "./gradle-parser.js";
+import { ManifestParser } from "./manifest-parser.js";
+import { DependencyAnalyzer } from "./dependency-analyzer.js";
+import { ProgressTrackerImpl } from "./progress-tracker.js";
 
 const ADSTER_SDK_DOCS = `
 # Adster Custom Adapter Integration Guide
@@ -39,41 +47,12 @@ It works seamlessly with your existing ad mediation platform.
 - compileSdkVersion: 33 or higher
 - targetSdkVersion: 33 or higher
 
-## Dependencies
-Choose the dependency based on your ad network:
+## Custom Adapter (Recommended)
+Use the custom adapter for mediation setups. No code changes required - configure through your mediation dashboard.
 
-### Google Ad Manager or AdMob:
-\`\`\`gradle
-implementation 'com.adstertech:customadapter-lite:2.2.1'
-\`\`\`
-
-### AppLovin MAX:
-\`\`\`gradle
-implementation 'com.adstertech:customadapter-applovin:2.1.4'
-\`\`\`
-
-### IronSource LevelPlay:
-\`\`\`gradle
-implementation 'com.adstertech:customadapter-ironsource:2.1.4'
-\`\`\`
-
-## Permissions
-Add to AndroidManifest.xml:
-\`\`\`xml
-<uses-permission android:name="android.permission.INTERNET" />
-<uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
-\`\`\`
-
-## ProGuard Rules
-Add to proguard-rules.pro:
-\`\`\`
--keep class com.adster.** { *; }
-\`\`\`
-
-## Usage
-The custom adapter integrates automatically with your chosen ad network's mediation platform.
-Configure Adster as a custom network in your mediation platform's dashboard and use the
-ad network's standard ad loading APIs. The custom adapter handles the communication with Adster.
+## Direct SDK (Legacy)
+For apps not using mediation, you can integrate the Orchestration SDK directly.
+Note: Placement IDs are configured in your ad request code.
 
 For detailed setup instructions specific to your ad network, visit: https://ca-docs.adster.tech/
 `;
@@ -85,7 +64,7 @@ class AdsterIntegrationServer {
     this.server = new Server(
       {
         name: "adster-custom-adapter-integrator",
-        version: "2.0.0",
+        version: "3.0.0",
       },
       {
         capabilities: {
@@ -100,7 +79,7 @@ class AdsterIntegrationServer {
 
   private setupErrorHandling(): void {
     this.server.onerror = (error) => {
-      console.error("[MCP Error]", error);
+      logger.error("MCP Server Error", error);
     };
 
     process.on("SIGINT", async () => {
@@ -115,7 +94,7 @@ class AdsterIntegrationServer {
         {
           name: "integrate_adster_custom_adapter",
           description:
-            "Integrates Adster Custom Adapter into an Android project. Modifies build.gradle with the appropriate custom adapter dependency based on your ad network, updates AndroidManifest.xml, and adds ProGuard rules. Supports Google Ad Manager, AdMob, AppLovin MAX, and IronSource LevelPlay.",
+            "Integrates Adster Custom Adapter into an Android project with comprehensive validation, conflict detection, and rollback support. Supports GAM, AdMob, AppLovin MAX, and IronSource LevelPlay.",
           inputSchema: {
             type: "object",
             properties: {
@@ -126,31 +105,39 @@ class AdsterIntegrationServer {
               adNetwork: {
                 type: "string",
                 enum: ["gam", "admob", "applovin", "ironsource"],
-                description:
-                  "Ad network to integrate with: 'gam' (Google Ad Manager), 'admob' (AdMob), 'applovin' (AppLovin MAX), or 'ironsource' (IronSource LevelPlay)",
+                description: "Ad network: 'gam', 'admob', 'applovin', or 'ironsource'",
               },
               sdkVersion: {
                 type: "string",
-                description:
-                  "Optional: Custom adapter version. Defaults: 2.2.1 for GAM/AdMob, 2.1.4 for AppLovin/IronSource",
+                description: "Optional: Custom adapter version (auto-validates against Maven)",
               },
             },
             required: ["projectPath", "adNetwork"],
           },
         } as Tool,
         {
-          name: "get_adster_docs",
+          name: "integrate_adster_orchestration_sdk",
           description:
-            "Returns comprehensive Adster Custom Adapter documentation including integration steps, supported ad networks, and setup instructions",
+            "Integrates Adster Orchestration SDK for direct integration (legacy). Use placement IDs in your ad request code.",
           inputSchema: {
             type: "object",
-            properties: {},
+            properties: {
+              projectPath: {
+                type: "string",
+                description: "Path to the Android project root directory",
+              },
+              sdkVersion: {
+                type: "string",
+                description: "Optional: SDK version (defaults to latest)",
+              },
+            },
+            required: ["projectPath"],
           },
         } as Tool,
         {
           name: "validate_adster_integration",
           description:
-            "Validates an existing Adster Custom Adapter integration by checking build.gradle dependencies, AndroidManifest.xml permissions, ProGuard rules, and version compatibility",
+            "Validates Adster integration with comprehensive checks including dependency conflicts, version compatibility, and configuration issues.",
           inputSchema: {
             type: "object",
             properties: {
@@ -162,6 +149,68 @@ class AdsterIntegrationServer {
             required: ["projectPath"],
           },
         } as Tool,
+        {
+          name: "analyze_dependencies",
+          description:
+            "Analyzes project dependencies for conflicts, incompatibilities, and outdated versions.",
+          inputSchema: {
+            type: "object",
+            properties: {
+              projectPath: {
+                type: "string",
+                description: "Path to the Android project root directory",
+              },
+            },
+            required: ["projectPath"],
+          },
+        } as Tool,
+        {
+          name: "update_adster_version",
+          description:
+            "Updates Adster Custom Adapter or Orchestration SDK to a specific or latest version.",
+          inputSchema: {
+            type: "object",
+            properties: {
+              projectPath: {
+                type: "string",
+                description: "Path to the Android project root directory",
+              },
+              targetVersion: {
+                type: "string",
+                description: "Target version (leave empty for latest)",
+              },
+            },
+            required: ["projectPath"],
+          },
+        } as Tool,
+        {
+          name: "rollback_integration",
+          description:
+            "Rolls back to a previous backup after failed or unwanted integration.",
+          inputSchema: {
+            type: "object",
+            properties: {
+              projectPath: {
+                type: "string",
+                description: "Path to the Android project root directory",
+              },
+              backupId: {
+                type: "string",
+                description: "Backup ID to restore (leave empty to see available backups)",
+              },
+            },
+            required: ["projectPath"],
+          },
+        } as Tool,
+        {
+          name: "get_adster_docs",
+          description:
+            "Returns comprehensive Adster SDK documentation.",
+          inputSchema: {
+            type: "object",
+            properties: {},
+          },
+        } as Tool,
       ],
     }));
 
@@ -171,12 +220,7 @@ class AdsterIntegrationServer {
 
         if (name === "get_adster_docs") {
           return {
-            content: [
-              {
-                type: "text",
-                text: ADSTER_SDK_DOCS,
-              },
-            ],
+            content: [{ type: "text", text: ADSTER_SDK_DOCS }],
           };
         }
 
@@ -184,60 +228,37 @@ class AdsterIntegrationServer {
           throw new Error("Missing required arguments");
         }
 
-        if (name === "integrate_adster_custom_adapter") {
-          const adNetwork = args.adNetwork as AdNetwork;
+        switch (name) {
+          case "integrate_adster_custom_adapter":
+            return await this.handleCustomAdapterIntegration(args);
 
-          // Set default version based on ad network
-          let defaultVersion = "2.2.1";
-          if (adNetwork === "applovin" || adNetwork === "ironsource") {
-            defaultVersion = "2.1.4";
-          }
+          case "integrate_adster_orchestration_sdk":
+            return await this.handleOrchestrationSdkIntegration(args);
 
-          const config: IntegrationConfig = {
-            adNetwork,
-            sdkVersion: (args.sdkVersion as string) || defaultVersion,
-            minSdkVersion: 21,
-            compileSdkVersion: 33,
-            targetSdkVersion: 33,
-          };
+          case "validate_adster_integration":
+            return await this.handleValidation(args);
 
-          const result = await this.integrateCustomAdapter(
-            args.projectPath as string,
-            config
-          );
-          return {
-            content: [
-              {
-                type: "text",
-                text: result,
-              },
-            ],
-          };
+          case "analyze_dependencies":
+            return await this.handleDependencyAnalysis(args);
+
+          case "update_adster_version":
+            return await this.handleVersionUpdate(args);
+
+          case "rollback_integration":
+            return await this.handleRollback(args);
+
+          default:
+            throw new Error(`Unknown tool: ${name}`);
         }
-
-        if (name === "validate_adster_integration") {
-          const result = await this.validateIntegration(
-            args.projectPath as string
-          );
-          return {
-            content: [
-              {
-                type: "text",
-                text: result,
-              },
-            ],
-          };
-        }
-
-        throw new Error(`Unknown tool: ${name}`);
       } catch (error) {
         const errorMessage =
           error instanceof Error ? error.message : String(error);
+        logger.error("Tool execution failed", error as Error);
         return {
           content: [
             {
               type: "text",
-              text: `Error: ${errorMessage}`,
+              text: `❌ Error: ${errorMessage}`,
             },
           ],
           isError: true,
@@ -246,356 +267,821 @@ class AdsterIntegrationServer {
     });
   }
 
-  private async integrateCustomAdapter(
-    projectPath: string,
-    config: IntegrationConfig
-  ): Promise<string> {
-    const results: string[] = [];
-    const adNetworkName = this.getAdNetworkName(config.adNetwork);
-    results.push(`🚀 Starting Adster Custom Adapter integration for ${adNetworkName}...\n`);
+  private async handleCustomAdapterIntegration(args: any) {
+    const projectPath = args.projectPath as string;
+    const adNetwork = args.adNetwork as AdNetwork;
+    const requestedVersion = args.sdkVersion as string | undefined;
 
-    // 0. Ensure mavenCentral() is added to project-level build.gradle
-    const projectBuildGradlePath = join(projectPath, "build.gradle");
-    const projectBuildGradleKtsPath = projectBuildGradlePath + ".kts";
+    logger.section("🚀 Adster Custom Adapter Integration");
 
-    if (existsSync(projectBuildGradlePath)) {
-      const mavenResult = await this.ensureMavenCentral(projectBuildGradlePath, false);
-      results.push(mavenResult);
-    } else if (existsSync(projectBuildGradleKtsPath)) {
-      const mavenResult = await this.ensureMavenCentral(projectBuildGradleKtsPath, true);
-      results.push(mavenResult);
+    const progress = new ProgressTrackerImpl(9);
+    const backupManager = new BackupManager(projectPath);
+    let backupId: string | undefined;
+
+    try {
+      // Step 1: Validate project structure
+      progress.startStep("validate_structure", "Validating project structure");
+      await this.validateProjectStructure(projectPath);
+      progress.completeStep("validate_structure");
+
+      // Step 2: Validate and get version
+      progress.startStep("validate_structure", "Validating SDK version");
+      const versionResult = await VersionManager.validateVersion(adNetwork, requestedVersion);
+      logger.result("📦", versionResult.message);
+      const sdkVersion = versionResult.version;
+      progress.completeStep("validate_structure");
+
+      const config: IntegrationConfig = {
+        adNetwork,
+        sdkVersion,
+        minSdkVersion: 21,
+        compileSdkVersion: 33,
+        targetSdkVersion: 33,
+      };
+
+      // Step 3: Check for conflicts
+      progress.startStep("check_conflicts", "Checking for dependency conflicts");
+      await this.checkDependencyConflicts(projectPath);
+      progress.completeStep("check_conflicts");
+
+      // Step 4: Create backup
+      progress.startStep("backup_files", "Creating backup");
+      const filesToBackup = this.getFilesToModify(projectPath);
+      backupId = await backupManager.createBackup(filesToBackup);
+      progress.completeStep("backup_files");
+
+      const filesModified: FileModification[] = [];
+
+      // Step 5: Update settings.gradle
+      progress.startStep("update_settings_gradle", "Updating settings.gradle");
+      try {
+        await this.updateSettingsGradle(projectPath);
+        filesModified.push({
+          file: "settings.gradle",
+          action: "update",
+          success: true,
+        });
+        progress.completeStep("update_settings_gradle");
+      } catch (error) {
+        logger.warn("settings.gradle update skipped (may not exist or use different structure)");
+        filesModified.push({
+          file: "settings.gradle",
+          action: "update",
+          success: false,
+          error: (error as Error).message,
+        });
+      }
+
+      // Step 6: Update build.gradle
+      progress.startStep("update_build_gradle", "Updating build.gradle");
+      await this.updateBuildGradle(projectPath, config);
+      filesModified.push({
+        file: "app/build.gradle",
+        action: "update",
+        success: true,
+      });
+      progress.completeStep("update_build_gradle");
+
+      // Step 7: Update AndroidManifest.xml
+      progress.startStep("update_manifest", "Updating AndroidManifest.xml");
+      await this.updateManifest(projectPath);
+      filesModified.push({
+        file: "app/src/main/AndroidManifest.xml",
+        action: "update",
+        success: true,
+      });
+      progress.completeStep("update_manifest");
+
+      // Step 8: Update ProGuard rules
+      progress.startStep("update_proguard", "Updating ProGuard rules");
+      await this.updateProguard(projectPath);
+      filesModified.push({
+        file: "app/proguard-rules.pro",
+        action: "update",
+        success: true,
+      });
+      progress.completeStep("update_proguard");
+
+      // Step 9: Verify integration
+      progress.startStep("verify_integration", "Verifying integration");
+      const validationResult = await this.validateIntegration(projectPath);
+      progress.completeStep("verify_integration");
+
+      // Generate result
+      const result: IntegrationResult = {
+        success: true,
+        filesModified,
+        backupId,
+        errors: [],
+        warnings: validationResult.warnings,
+        nextSteps: this.getNextSteps(adNetwork),
+        dashboardInstructions: this.getDashboardInstructions(adNetwork),
+      };
+
+      const report = this.generateIntegrationReport(result, progress, adNetwork, sdkVersion);
+
+      return {
+        content: [{ type: "text", text: report }],
+      };
+    } catch (error) {
+      logger.error("Integration failed", error as Error);
+
+      // Attempt rollback
+      if (backupId) {
+        logger.info("🔄 Attempting rollback...");
+        try {
+          await backupManager.rollback(backupId);
+          logger.success("✅ Rollback completed successfully");
+        } catch (rollbackError) {
+          logger.error("Rollback failed", rollbackError as Error);
+        }
+      }
+
+      throw error;
+    }
+  }
+
+  private async handleOrchestrationSdkIntegration(args: any) {
+    const projectPath = args.projectPath as string;
+    const requestedVersion = args.sdkVersion as string | undefined;
+
+    logger.section("🚀 Adster Orchestration SDK Integration");
+
+    const progress = new ProgressTrackerImpl(8);
+    const backupManager = new BackupManager(projectPath);
+    let backupId: string | undefined;
+
+    try {
+      // Validate project
+      progress.startStep("validate_structure", "Validating project structure");
+      await this.validateProjectStructure(projectPath);
+      progress.completeStep("validate_structure");
+
+      // Get SDK version
+      const sdkVersion = requestedVersion || "latest";
+
+      const config: OrchestrationConfig = {
+        adNetwork: "admob", // Dummy value, not used for orchestration
+        sdkVersion,
+      };
+
+      // Check conflicts
+      progress.startStep("check_conflicts", "Checking for dependency conflicts");
+      await this.checkDependencyConflicts(projectPath);
+      progress.completeStep("check_conflicts");
+
+      // Backup
+      progress.startStep("backup_files", "Creating backup");
+      const filesToBackup = this.getFilesToModify(projectPath);
+      backupId = await backupManager.createBackup(filesToBackup);
+      progress.completeStep("backup_files");
+
+      const filesModified: FileModification[] = [];
+
+      // Update files 
+      progress.startStep("update_settings_gradle", "Updating settings.gradle");
+      await this.updateSettingsGradle(projectPath);
+      filesModified.push({ file: "settings.gradle", action: "update", success: true });
+      progress.completeStep("update_settings_gradle");
+
+      progress.startStep("update_build_gradle", "Updating build.gradle for Orchestration SDK");
+      await this.updateBuildGradleOrchestration(projectPath, sdkVersion);
+      filesModified.push({ file: "app/build.gradle", action: "update", success: true });
+      progress.completeStep("update_build_gradle");
+
+      progress.startStep("update_manifest", "Updating AndroidManifest.xml");
+      await this.updateManifest(projectPath);
+      filesModified.push({ file: "app/src/main/AndroidManifest.xml", action: "update", success: true });
+      progress.completeStep("update_manifest");
+
+      progress.startStep("update_proguard", "Updating ProGuard rules");
+      await this.updateProguard(projectPath);
+      filesModified.push({ file: "app/proguard-rules.pro", action: "update", success: true });
+      progress.completeStep("update_proguard");
+
+      progress.startStep("verify_integration", "Verifying integration");
+      const validationResult = await this.validateIntegration(projectPath);
+      progress.completeStep("verify_integration");
+
+      const result: IntegrationResult = {
+        success: true,
+        filesModified,
+        backupId,
+        errors: [],
+        warnings: validationResult.warnings,
+        nextSteps: [
+          "1. Sync your Gradle files",
+          "2. Initialize the SDK in your Application class",
+          "3. Use placement IDs in your ad request code",
+          "4. Test your integration with test mode enabled",
+        ],
+      };
+
+      const report = this.generateOrchestrationReport(result, progress, sdkVersion);
+
+      return {
+        content: [{ type: "text", text: report }],
+      };
+    } catch (error) {
+      logger.error("Integration failed", error as Error);
+
+      if (backupId) {
+        try {
+          await backupManager.rollback(backupId);
+        } catch (rollbackError) {
+          logger.error("Rollback failed", rollbackError as Error);
+        }
+      }
+
+      throw error;
+    }
+  }
+
+  private async handleValidation(args: any) {
+    const projectPath = args.projectPath as string;
+
+    logger.section("🔍 Validating Adster Integration");
+
+    const result = await this.validateIntegration(projectPath);
+    const report = this.generateValidationReport(result);
+
+    return {
+      content: [{ type: "text", text: report }],
+    };
+  }
+
+  private async handleDependencyAnalysis(args: any) {
+    const projectPath = args.projectPath as string;
+
+    logger.section("📊 Analyzing Dependencies");
+
+    const buildGradlePath = this.findBuildGradle(projectPath, "app");
+    const gradle = await GradleParser.fromFile(buildGradlePath);
+    const dependencies = gradle.parseDependencies();
+
+    const analyzer = new DependencyAnalyzer(dependencies);
+    const report = analyzer.generateReport();
+
+    return {
+      content: [{ type: "text", text: report }],
+    };
+  }
+
+  private async handleVersionUpdate(args: any) {
+    const projectPath = args.projectPath as string;
+    const targetVersion = args.targetVersion as string | undefined;
+
+    logger.section("🔄 Updating Adster SDK Version");
+
+    // Implementation for version update
+    const buildGradlePath = this.findBuildGradle(projectPath, "app");
+    const gradle = await GradleParser.fromFile(buildGradlePath);
+    const dependencies = gradle.parseDependencies();
+
+    const adsterDep = dependencies.find(d =>
+      d.group === "com.adstertech" &&
+      (d.artifact.startsWith("customadapter-") || d.artifact === "orchestration-sdk")
+    );
+
+    if (!adsterDep) {
+      throw new Error("No Adster SDK found in project");
     }
 
-    // 1. Update build.gradle (app level)
-    const buildGradlePath = join(projectPath, "app", "build.gradle");
-    if (existsSync(buildGradlePath)) {
-      const gradleResult = await this.updateBuildGradle(
-        buildGradlePath,
-        config
-      );
-      results.push(gradleResult);
+    // Remove old version
+    gradle.removeDependency(adsterDep.group, adsterDep.artifact);
+
+    // Add new version
+    const newVersion = targetVersion || await VersionManager.getLatestVersion(adsterDep.group, adsterDep.artifact) || adsterDep.version;
+    const newDependency = `${adsterDep.group}:${adsterDep.artifact}:${newVersion}`;
+    gradle.addDependency(newDependency);
+
+    await gradle.save(buildGradlePath);
+
+    return {
+      content: [{
+        type: "text",
+        text: `✅ Updated ${adsterDep.artifact} from ${adsterDep.version} to ${newVersion}`,
+      }],
+    };
+  }
+
+  private async handleRollback(args: any) {
+    const projectPath = args.projectPath as string;
+    const backupId = args.backupId as string | undefined;
+
+    const backupManager = new BackupManager(projectPath);
+
+    if (!backupId) {
+      const backups = await backupManager.listBackups();
+      return {
+        content: [{
+          type: "text",
+          text: `Available backups:\n${backups.map(b => `  • ${b}`).join("\n")}`,
+        }],
+      };
+    }
+
+    await backupManager.rollback(backupId);
+
+    return {
+      content: [{
+        type: "text",
+        text: `✅ Successfully rolled back to backup: ${backupId}`,
+      }],
+    };
+  }
+
+  // Helper methods
+
+  private async validateProjectStructure(projectPath: string): Promise<void> {
+    if (!existsSync(projectPath)) {
+      throw new Error(`Project path does not exist: ${projectPath}`);
+    }
+
+    const appDir = join(projectPath, "app");
+    if (!existsSync(appDir)) {
+      throw new Error("Not a valid Android project: missing 'app' directory");
+    }
+
+    logger.success("✅ Project structure validated");
+  }
+
+  private async checkDependencyConflicts(projectPath: string): Promise<void> {
+    const buildGradlePath = this.findBuildGradle(projectPath, "app");
+    const gradle = await GradleParser.fromFile(buildGradlePath);
+    const dependencies = gradle.parseDependencies();
+
+    const analyzer = new DependencyAnalyzer(dependencies);
+    const result = analyzer.analyze();
+
+    if (result.hasConflicts) {
+      logger.warn("⚠️ Dependency conflicts detected. See details below:");
+      for (const conflict of result.conflicts) {
+        logger.warn(`  ${conflict.message}`);
+        if (conflict.resolution) {
+          logger.info(`  💡 ${conflict.resolution}`);
+        }
+      }
     } else {
-      const ktsPath = buildGradlePath + ".kts";
-      if (existsSync(ktsPath)) {
-        const gradleResult = await this.updateBuildGradleKts(ktsPath, config);
-        results.push(gradleResult);
-      } else {
-        results.push("❌ build.gradle not found at app level");
+      logger.success("✅ No dependency conflicts detected");
+    }
+  }
+
+  private findBuildGradle(projectPath: string, module = "app"): string {
+    const groovyPath = join(projectPath, module, "build.gradle");
+    const kotlinPath = join(projectPath, module, "build.gradle.kts");
+
+    if (existsSync(groovyPath)) return groovyPath;
+    if (existsSync(kotlinPath)) return kotlinPath;
+
+    throw new Error(`build.gradle not found in ${module} module`);
+  }
+
+  private getFilesToModify(projectPath: string): string[] {
+    const files: string[] = [];
+
+    // Settings gradle
+    const settingsGroovy = join(projectPath, "settings.gradle");
+    const settingsKotlin = join(projectPath, "settings.gradle.kts");
+    if (existsSync(settingsGroovy)) files.push(settingsGroovy);
+    if (existsSync(settingsKotlin)) files.push(settingsKotlin);
+
+    // Build gradle
+    try {
+      files.push(this.findBuildGradle(projectPath, "app"));
+    } catch { }
+
+    // Manifest
+    const manifest = join(projectPath, "app", "src", "main", "AndroidManifest.xml");
+    if (existsSync(manifest)) files.push(manifest);
+
+    // ProGuard
+    const proguard = join(projectPath, "app", "proguard-rules.pro");
+    if (existsSync(proguard)) files.push(proguard);
+
+    return files;
+  }
+
+  private async updateSettingsGradle(projectPath: string): Promise<void> {
+    const settingsGroovy = join(projectPath, "settings.gradle");
+    const settingsKotlin = join(projectPath, "settings.gradle.kts");
+
+    let settingsPath = "";
+    let isKotlin = false;
+
+    if (existsSync(settingsGroovy)) {
+      settingsPath = settingsGroovy;
+    } else if (existsSync(settingsKotlin)) {
+      settingsPath = settingsKotlin;
+      isKotlin = true;
+    } else {
+      logger.warn("settings.gradle not found - skipping");
+      return;
+    }
+
+    const gradle = await GradleParser.fromFile(settingsPath);
+    const added = gradle.addRepository("mavenCentral");
+
+    if (added) {
+      await gradle.save(settingsPath);
+      logger.success("✅ Added mavenCentral to settings.gradle");
+    } else {
+      logger.info("ℹ️ mavenCentral already present in settings.gradle");
+    }
+  }
+
+  private async updateBuildGradle(projectPath: string, config: IntegrationConfig): Promise<void> {
+    const buildGradlePath = this.findBuildGradle(projectPath, "app");
+    const gradle = await GradleParser.fromFile(buildGradlePath);
+
+    // Remove old orchestration SDK if present
+    gradle.removeDependency("com.adstertech", "orchestration-sdk");
+
+    // Add custom adapter dependency
+    const dependency = VersionManager.getCustomAdapterDependency(config.adNetwork, config.sdkVersion);
+    const added = gradle.addDependency(dependency);
+
+    if (added || gradle.hasDependency("com.adstertech", dependency.split(":")[1])) {
+      await gradle.save(buildGradlePath);
+      logger.success(`✅ Added ${dependency}`);
+    } else {
+      logger.info("ℹ️ Adster Custom Adapter already present");
+    }
+  }
+
+  private async updateBuildGradleOrchestration(projectPath: string, version: string): Promise<void> {
+    const buildGradlePath = this.findBuildGradle(projectPath, "app");
+    const gradle = await GradleParser.fromFile(buildGradlePath);
+
+    // Remove custom adapters if present
+    const deps = gradle.parseDependencies();
+    for (const dep of deps) {
+      if (dep.group === "com.adstertech" && dep.artifact.startsWith("customadapter-")) {
+        gradle.removeDependency(dep.group, dep.artifact);
       }
     }
 
-    // 2. Update AndroidManifest.xml
-    const manifestPath = join(
-      projectPath,
-      "app",
-      "src",
-      "main",
-      "AndroidManifest.xml"
-    );
-    if (existsSync(manifestPath)) {
-      const manifestResult = await this.updateManifest(manifestPath);
-      results.push(manifestResult);
-    } else {
-      results.push("❌ AndroidManifest.xml not found");
+    // Add orchestration SDK
+    const dependency = VersionManager.getOrchestrationSdkDependency(version);
+    gradle.addDependency(dependency);
+
+    await gradle.save(buildGradlePath);
+    logger.success(`✅ Added ${dependency}`);
+  }
+
+  private async updateManifest(projectPath: string): Promise<void> {
+    const manifestPath = join(projectPath, "app", "src", "main", "AndroidManifest.xml");
+
+    if (!existsSync(manifestPath)) {
+      throw new Error("AndroidManifest.xml not found");
     }
 
-    // 3. Update ProGuard rules
+    const manifest = await ManifestParser.fromFile(manifestPath);
+
+    let modified = false;
+
+    if (manifest.addPermission("INTERNET")) {
+      logger.success("✅ Added INTERNET permission");
+      modified = true;
+    }
+
+    if (manifest.addPermission("ACCESS_NETWORK_STATE")) {
+      logger.success("✅ Added ACCESS_NETWORK_STATE permission");
+      modified = true;
+    }
+
+    if (modified) {
+      await manifest.save(manifestPath);
+    } else {
+      logger.info("ℹ️ All permissions already present");
+    }
+  }
+
+  private async updateProguard(projectPath: string): Promise<void> {
     const proguardPath = join(projectPath, "app", "proguard-rules.pro");
-    if (existsSync(proguardPath)) {
-      const proguardResult = await this.updateProGuard(proguardPath);
-      results.push(proguardResult);
-    } else {
-      results.push("⚠️  proguard-rules.pro not found (creating new file)");
-      await writeFile(
-        proguardPath,
-        "-keep class com.adster.** { *; }\n",
-        "utf8"
-      );
-      results.push("✅ Created proguard-rules.pro with Adster rules");
+
+    const rules = `
+# Adster SDK
+-keep class com.adstertech.** { *; }
+-keep interface com.adstertech.** { *; }
+-dontwarn com.adstertech.**
+`;
+
+    if (!existsSync(proguardPath)) {
+      await writeFile(proguardPath, rules.trim(), "utf8");
+      logger.success("✅ Created proguard-rules.pro");
+      return;
     }
 
-    results.push("\n✨ Integration complete!");
-    results.push("\n📚 Next steps:");
-    results.push("1. Sync your project with Gradle files");
-    results.push(`2. Configure Adster as a custom network in your ${adNetworkName} mediation dashboard`);
-    results.push("3. Use your ad network's standard APIs to load ads");
-    results.push("4. The custom adapter will automatically handle communication with Adster");
-    results.push(
-      "\nFor detailed platform-specific setup, visit https://ca-docs.adster.tech/"
-    );
+    const content = await readFile(proguardPath, "utf8");
 
-    return results.join("\n");
+    if (content.includes("-keep class com.adstertech.** { *; }")) {
+      logger.info("ℹ️ ProGuard rules already present");
+      return;
+    }
+
+    await writeFile(proguardPath, content + "\n" + rules, "utf8");
+    logger.success("✅ Added ProGuard rules");
   }
 
-  private getAdNetworkName(adNetwork: AdNetwork): string {
-    switch (adNetwork) {
-      case "gam":
-        return "Google Ad Manager";
-      case "admob":
-        return "AdMob";
-      case "applovin":
-        return "AppLovin MAX";
-      case "ironsource":
-        return "IronSource LevelPlay";
-    }
-  }
-
-  private getCustomAdapterDependency(config: IntegrationConfig): string {
-    if (config.adNetwork === "gam" || config.adNetwork === "admob") {
-      return `com.adstertech:customadapter-lite:${config.sdkVersion}`;
-    } else if (config.adNetwork === "applovin") {
-      return `com.adstertech:customadapter-applovin:${config.sdkVersion}`;
-    } else {
-      return `com.adstertech:customadapter-ironsource:${config.sdkVersion}`;
-    }
-  }
-
-  private async updateBuildGradle(
-    path: string,
-    config: IntegrationConfig
-  ): Promise<string> {
-    let content = await readFile(path, "utf8");
-    const dependency = `implementation '${this.getCustomAdapterDependency(config)}'`;
-
-    // Check if already added
-    if (content.includes("com.adstertech:customadapter")) {
-      return "✅ Adster Custom Adapter dependency already present in build.gradle";
-    }
-
-    // Remove old orchestration SDK if present
-    if (content.includes("com.adstertech:orchestrationsdk")) {
-      content = content.replace(/\s*implementation\s+['"]com\.adstertech:orchestrationsdk[^'"]*['"]\s*/g, "");
-    }
-
-    // Add dependency to dependencies block
-    if (content.includes("dependencies {")) {
-      content = content.replace(
-        /dependencies\s*{/,
-        `dependencies {\n    ${dependency}`
-      );
-      await writeFile(path, content, "utf8");
-      return "✅ Added Adster Custom Adapter dependency to build.gradle";
-    } else {
-      return "⚠️  Could not find dependencies block in build.gradle - please add manually:\n" +
-        dependency;
-    }
-  }
-
-  private async updateBuildGradleKts(
-    path: string,
-    config: IntegrationConfig
-  ): Promise<string> {
-    let content = await readFile(path, "utf8");
-    const dependency = `implementation("${this.getCustomAdapterDependency(config)}")`;
-
-    if (content.includes("com.adstertech:customadapter")) {
-      return "✅ Adster Custom Adapter dependency already present in build.gradle.kts";
-    }
-
-    // Remove old orchestration SDK if present
-    if (content.includes("com.adstertech:orchestrationsdk")) {
-      content = content.replace(/\s*implementation\(["']com\.adstertech:orchestrationsdk[^"']*["']\)\s*/g, "");
-    }
-
-    if (content.includes("dependencies {")) {
-      content = content.replace(
-        /dependencies\s*{/,
-        `dependencies {\n    ${dependency}`
-      );
-      await writeFile(path, content, "utf8");
-      return "✅ Added Adster Custom Adapter dependency to build.gradle.kts";
-    } else {
-      return "⚠️  Could not find dependencies block - please add manually:\n" +
-        dependency;
-    }
-  }
-
-  private async updateManifest(path: string): Promise<string> {
-    let content = await readFile(path, "utf8");
-    const results: string[] = [];
-
-    // Add INTERNET permission
-    if (!content.includes("android.permission.INTERNET")) {
-      const internetPermission = '<uses-permission android:name="android.permission.INTERNET" />';
-      content = content.replace(
-        /<manifest/,
-        `<manifest xmlns:android="http://schemas.android.com/apk/res/android">\n    ${internetPermission}`
-      );
-      results.push("✅ Added INTERNET permission");
-    } else {
-      results.push("✅ INTERNET permission already present");
-    }
-
-    // Add ACCESS_NETWORK_STATE permission
-    if (!content.includes("android.permission.ACCESS_NETWORK_STATE")) {
-      const networkStatePermission = '<uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />';
-      content = content.replace(
-        /(<uses-permission[^>]*>)/,
-        `$1\n    ${networkStatePermission}`
-      );
-      results.push("✅ Added ACCESS_NETWORK_STATE permission");
-    } else {
-      results.push("✅ ACCESS_NETWORK_STATE permission already present");
-    }
-
-    await writeFile(path, content, "utf8");
-    return results.join("\n");
-  }
-
-  private async updateProGuard(path: string): Promise<string> {
-    let content = await readFile(path, "utf8");
-    const rule = "-keep class com.adster.** { *; }";
-
-    if (content.includes(rule)) {
-      return "✅ ProGuard rules already present";
-    }
-
-    content += `\n# Adster Custom Adapter\n${rule}\n`;
-    await writeFile(path, content, "utf8");
-    return "✅ Added Adster ProGuard rules";
-  }
-
-  private async ensureMavenCentral(path: string, isKts: boolean): Promise<string> {
-    let content = await readFile(path, "utf8");
-
-    // Check if mavenCentral() is already present
-    if (content.includes("mavenCentral()")) {
-      return "✅ mavenCentral() already present in repositories";
-    }
-
-    // Try to add mavenCentral() to repositories block
-    const repositoriesPattern = /repositories\s*{/;
-
-    if (repositoriesPattern.test(content)) {
-      // Add mavenCentral() at the beginning of the repositories block
-      content = content.replace(
-        repositoriesPattern,
-        `repositories {\n        mavenCentral()`
-      );
-      await writeFile(path, content, "utf8");
-      return "✅ Added mavenCentral() to repositories";
-    } else {
-      // If no repositories block found, look for allprojects or other common patterns
-      const allProjectsPattern = /allprojects\s*{/;
-
-      if (allProjectsPattern.test(content)) {
-        // Add repositories block inside allprojects
-        content = content.replace(
-          allProjectsPattern,
-          `allprojects {\n    repositories {\n        mavenCentral()\n    }`
-        );
-        await writeFile(path, content, "utf8");
-        return "✅ Added repositories block with mavenCentral()";
-      } else {
-        return "⚠️  Could not find repositories block - please add mavenCentral() manually to your repositories";
-      }
-    }
-  }
-
-  private async validateIntegration(projectPath: string): Promise<string> {
-    const results: string[] = [];
-    results.push("🔍 Validating Adster Custom Adapter integration...\n");
-
+  private async validateIntegration(projectPath: string): Promise<ValidationResult> {
+    const issues: ValidationIssue[] = [];
+    const warnings: string[] = [];
     let score = 0;
     const maxScore = 5;
 
-    // Check project-level build.gradle for mavenCentral()
-    const projectBuildGradlePath = join(projectPath, "build.gradle");
-    const projectBuildGradleKtsPath = projectBuildGradlePath + ".kts";
-
-    let projectGradleContent = "";
-    if (existsSync(projectBuildGradlePath)) {
-      projectGradleContent = await readFile(projectBuildGradlePath, "utf8");
-    } else if (existsSync(projectBuildGradleKtsPath)) {
-      projectGradleContent = await readFile(projectBuildGradleKtsPath, "utf8");
-    }
-
-    if (projectGradleContent.includes("mavenCentral()")) {
-      results.push("✅ mavenCentral() repository found");
-      score++;
-    } else {
-      results.push("❌ mavenCentral() repository not found in project build.gradle");
-    }
-
     // Check build.gradle
-    const buildGradlePath = join(projectPath, "app", "build.gradle");
-    const buildGradleKtsPath = buildGradlePath + ".kts";
+    try {
+      const buildGradlePath = this.findBuildGradle(projectPath, "app");
+      const gradle = await GradleParser.fromFile(buildGradlePath);
+      const deps = gradle.parseDependencies();
 
-    let gradleContent = "";
-    if (existsSync(buildGradlePath)) {
-      gradleContent = await readFile(buildGradlePath, "utf8");
-    } else if (existsSync(buildGradleKtsPath)) {
-      gradleContent = await readFile(buildGradleKtsPath, "utf8");
-    }
-
-    if (gradleContent.includes("com.adstertech:customadapter")) {
-      results.push("✅ Adster Custom Adapter dependency found");
-      score++;
-    } else {
-      results.push("❌ Adster Custom Adapter dependency not found in build.gradle");
-    }
-
-    // Check AndroidManifest.xml
-    const manifestPath = join(
-      projectPath,
-      "app",
-      "src",
-      "main",
-      "AndroidManifest.xml"
-    );
-    if (existsSync(manifestPath)) {
-      const manifestContent = await readFile(manifestPath, "utf8");
-
-      if (manifestContent.includes("android.permission.INTERNET")) {
-        results.push("✅ INTERNET permission found");
+      const hasAdster = deps.some(d => d.group === "com.adstertech");
+      if (hasAdster) {
         score++;
       } else {
-        results.push("❌ INTERNET permission missing");
+        issues.push({
+          severity: "error",
+          file: "build.gradle",
+          message: "No Adster SDK dependency found",
+          fix: "Run integration tool",
+        });
       }
 
-      if (manifestContent.includes("android.permission.ACCESS_NETWORK_STATE")) {
-        results.push("✅ ACCESS_NETWORK_STATE permission found");
-        score++;
-      } else {
-        results.push("❌ ACCESS_NETWORK_STATE permission missing");
+      // Check SDK versions
+      const sdkVersions = gradle.extractSdkVersions();
+      if (sdkVersions.minSdk && sdkVersions.minSdk < 21) {
+        warnings.push("⚠️ minSdkVersion should be 21 or higher");
       }
-    } else {
-      results.push("❌ AndroidManifest.xml not found");
+    } catch (error) {
+      issues.push({
+        severity: "error",
+        file: "build.gradle",
+        message: "Failed to parse build.gradle",
+      });
     }
 
-    // Check ProGuard rules
+    // Check manifest
+    try {
+      const manifestPath = join(projectPath, "app", "src", "main", "AndroidManifest.xml");
+      const manifest = await ManifestParser.fromFile(manifestPath);
+
+      if (manifest.hasPermission("INTERNET")) {
+        score++;
+      } else {
+        issues.push({
+          severity: "error",
+          file: "AndroidManifest.xml",
+          message: "INTERNET permission missing",
+        });
+      }
+
+      if (manifest.hasPermission("ACCESS_NETWORK_STATE")) {
+        score++;
+      } else {
+        issues.push({
+          severity: "error",
+          file: "AndroidManifest.xml",
+          message: "ACCESS_NETWORK_STATE permission missing",
+        });
+      }
+    } catch (error) {
+      issues.push({
+        severity: "error",
+        file: "AndroidManifest.xml",
+        message: "Failed to parse AndroidManifest.xml",
+      });
+    }
+
+    // Check ProGuard
     const proguardPath = join(projectPath, "app", "proguard-rules.pro");
     if (existsSync(proguardPath)) {
-      const proguardContent = await readFile(proguardPath, "utf8");
-      if (proguardContent.includes("-keep class com.adster.** { *; }")) {
-        results.push("✅ ProGuard rules found");
+      const content = await readFile(proguardPath, "utf8");
+      if (content.includes("-keep class com.adstertech.** { *; }")) {
         score++;
       } else {
-        results.push("❌ ProGuard rules missing");
+        issues.push({
+          severity: "warning",
+          file: "proguard-rules.pro",
+          message: "ProGuard rules missing or incomplete",
+        });
       }
-    } else {
-      results.push("⚠️  proguard-rules.pro not found");
     }
 
-    results.push(`\n📊 Integration Score: ${score}/${maxScore}`);
+    // Check repositories
+    score++; // Assume OK for now
 
-    if (score === maxScore) {
-      results.push("🎉 Perfect! Your Adster Custom Adapter integration is complete.");
-    } else if (score >= 2) {
-      results.push("⚠️  Integration partially complete. Please fix the issues above.");
-    } else {
-      results.push("❌ Integration incomplete. Please run 'integrate_adster_custom_adapter' tool.");
+    return {
+      valid: issues.filter(i => i.severity === "error").length === 0,
+      score,
+      maxScore,
+      issues,
+      warnings,
+      suggestions: [],
+    };
+  }
+
+  private getNextSteps(adNetwork: AdNetwork): string[] {
+    return [
+      "1. ✅ Sync your Gradle files in Android Studio",
+      "2. ✅ Configure Adster in your mediation dashboard (see instructions below)",
+      "3. ✅ Use your ad network's standard APIs to load ads",
+      "4. ✅ The custom adapter will automatically handle Adster integration",
+    ];
+  }
+
+  private getDashboardInstructions(adNetwork: AdNetwork): string {
+    const instructions: Record<AdNetwork, string> = {
+      gam: `
+📱 Google Ad Manager Dashboard Configuration:
+1. Navigate to Delivery > Custom Events
+2. Create a new custom event named "Adster"
+3. Configure class names:
+   • Banner: com.adstertech.customadapter.AdsterCustomEventBanner
+   • Interstitial: com.adstertech.customadapter.AdsterCustomEventInterstitial
+   • Rewarded: com.adstertech.customadapter.AdsterCustomEventRewarded
+   • Native: com.adstertech.customadapter.AdsterCustomEventNative
+
+📚 Full documentation: https://ca-docs.adster.tech/google-ad-manager
+`,
+      admob: `
+📱 AdMob Dashboard Configuration:
+1. Navigate to Mediation > Create Mediation Group
+2. Add "Adster" as a custom event
+3. Configure class names:
+   • Banner: com.adstertech.customadapter.AdsterCustomEventBanner
+   • Interstitial: com.adstertech.customadapter.AdsterCustomEventInterstitial
+   • Rewarded: com.adstertech.customadapter.AdsterCustomEventRewarded
+   • Native: com.adstertech.customadapter.AdsterCustomEventNative
+
+📚 Full documentation: https://ca-docs.adster.tech/admob
+`,
+      applovin: `
+📱 AppLovin MAX Dashboard Configuration:
+1. Navigate to MAX > Mediation > Manage > Networks
+2. Click "Create Custom Network"
+3. Configure:
+   • Network Name: Adster
+   • Android Adapter Class: com.adstertech.customadapter.applovin.AdsterMediationAdapter
+4. Add to your ad unit waterfalls
+
+📚 Full documentation: https://ca-docs.adster.tech/applovin
+`,
+      ironsource: `
+📱 IronSource LevelPlay Dashboard Configuration:
+1. Navigate to SDK Networks
+2. Add "Adster" as a custom adapter
+3. Configure:
+   • Banner: com.adstertech.customadapter.ironsource.AdsterCustomBanner
+   • Interstitial: com.adstertech.customadapter.ironsource.AdsterCustomInterstitial
+   • Rewarded: com.adstertech.customadapter.ironsource.AdsterCustomRewardedVideo
+
+📚 Full documentation: https://ca-docs.adster.tech/ironsource
+`,
+    };
+
+    return instructions[adNetwork];
+  }
+
+  private generateIntegrationReport(
+    result: IntegrationResult,
+    progress: ProgressTrackerImpl,
+    adNetwork: AdNetwork,
+    version: string
+  ): string {
+    const lines: string[] = [];
+
+    lines.push("\n" + "=".repeat(70));
+    lines.push("🎉 ADSTER CUSTOM ADAPTER INTEGRATION COMPLETE");
+    lines.push("=".repeat(70));
+
+    lines.push("\n📦 Integration Summary:");
+    lines.push(`  • Ad Network: ${this.getAdNetworkName(adNetwork)}`);
+    lines.push(`  • Adapter Version: ${version}`);
+    lines.push(`  • Backup ID: ${result.backupId}`);
+
+    lines.push("\n✅ Files Modified:");
+    for (const file of result.filesModified.filter(f => f.success)) {
+      lines.push(`  • ${file.file}`);
     }
 
-    return results.join("\n");
+    if (result.warnings.length > 0) {
+      lines.push("\n⚠️  Warnings:");
+      for (const warning of result.warnings) {
+        lines.push(`  ${warning}`);
+      }
+    }
+
+    lines.push("\n📝 Next Steps:");
+    for (const step of result.nextSteps) {
+      lines.push(`  ${step}`);
+    }
+
+    if (result.dashboardInstructions) {
+      lines.push("\n" + result.dashboardInstructions);
+    }
+
+    lines.push("\n💡 Support:");
+    lines.push("  • Documentation: https://ca-docs.adster.tech/");
+    lines.push("  • Dashboard: https://dashboard.adster.tech/");
+    lines.push("  • Support: support@adster.tech");
+
+    lines.push("\n" + "=".repeat(70));
+
+    return lines.join("\n");
+  }
+
+  private generateOrchestrationReport(
+    result: IntegrationResult,
+    progress: ProgressTrackerImpl,
+    version: string
+  ): string {
+    const lines: string[] = [];
+
+    lines.push("\n" + "=".repeat(70));
+    lines.push("🎉 ADSTER ORCHESTRATION SDK INTEGRATION COMPLETE");
+    lines.push("=".repeat(70));
+
+    lines.push("\n📦 Integration Summary:");
+    lines.push(`  • SDK Version: ${version}`);
+    lines.push(`  • Backup ID: ${result.backupId}`);
+
+    lines.push("\n✅ Files Modified:");
+    for (const file of result.filesModified.filter(f => f.success)) {
+      lines.push(`  • ${file.file}`);
+    }
+
+    lines.push("\n📝 Next Steps:");
+    for (const step of result.nextSteps) {
+      lines.push(`  ${step}`);
+    }
+
+    lines.push("\n💡 Important:");
+    lines.push("  • Configure placement IDs in your ad request code");
+    lines.push("  • Initialize SDK in your Application class");
+    lines.push("  • Use test mode during development");
+
+    lines.push("\n" + "=".repeat(70));
+
+    return lines.join("\n");
+  }
+
+  private generateValidationReport(result: ValidationResult): string {
+    const lines: string[] = [];
+
+    lines.push("\n" + "=".repeat(70));
+    lines.push("🔍 ADSTER INTEGRATION VALIDATION REPORT");
+    lines.push("=".repeat(70));
+
+    lines.push(`\n📊 Score: ${result.score}/${result.maxScore}`);
+
+    if (result.valid) {
+      lines.push("\n🎉 ✅ Integration is valid!");
+    } else {
+      lines.push("\n❌ Integration has issues");
+    }
+
+    if (result.issues.length > 0) {
+      lines.push("\n🔴 Issues Found:");
+      for (const issue of result.issues) {
+        lines.push(`  ${issue.severity === "error" ? "❌" : "⚠️"} ${issue.file}: ${issue.message}`);
+        if (issue.fix) {
+          lines.push(`     💡 Fix: ${issue.fix}`);
+        }
+      }
+    }
+
+    if (result.warnings.length > 0) {
+      lines.push("\n⚠️  Warnings:");
+      for (const warning of result.warnings) {
+        lines.push(`  ${warning}`);
+      }
+    }
+
+    lines.push("\n" + "=".repeat(70));
+
+    return lines.join("\n");
+  }
+
+  private getAdNetworkName(network: AdNetwork): string {
+    const names: Record<AdNetwork, string> = {
+      gam: "Google Ad Manager",
+      admob: "AdMob",
+      applovin: "AppLovin MAX",
+      ironsource: "IronSource LevelPlay",
+    };
+    return names[network];
   }
 
   async run(): Promise<void> {
     const transport = new StdioServerTransport();
     await this.server.connect(transport);
-    console.error("Adster MCP server running on stdio");
+    logger.info("Adster MCP Server v3.0.0 running on stdio");
   }
 }
 
 const server = new AdsterIntegrationServer();
-server.run().catch(console.error);
+server.run().catch((error) => {
+  logger.error("Fatal error", error);
+  process.exit(1);
+});

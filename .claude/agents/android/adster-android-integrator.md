@@ -44,7 +44,7 @@ Update `app/build.gradle` or `app/build.gradle.kts`:
 **Groovy (build.gradle):**
 ```gradle
 dependencies {
-    implementation 'com.adstertech:orchestration-sdk:+'
+    implementation 'com.adstertech:orchestrationsdk:+'
     implementation 'androidx.appcompat:appcompat:1.6.1'
     implementation 'com.google.android.material:material:1.9.0'
 }
@@ -53,7 +53,7 @@ dependencies {
 **Kotlin DSL (build.gradle.kts):**
 ```kotlin
 dependencies {
-    implementation("com.adstertech:orchestration-sdk:+")
+    implementation("com.adstertech:orchestrationsdk:+")
     implementation("androidx.appcompat:appcompat:1.6.1")
     implementation("com.google.android.material:material:1.9.0")
 }
@@ -218,7 +218,7 @@ After completing integration, provide a summary:
 
 ### Integration Details
 - **SDK Type**: Adster Orchestration SDK (Direct Integration)
-- **Dependency**: com.adstertech:orchestration-sdk
+- **Dependency**: com.adstertech:orchestrationsdk
 - **Initialization**: Application class
 
 ### Next Steps
@@ -229,7 +229,7 @@ After completing integration, provide a summary:
 
 ### Support
 - **Documentation**: https://docs.adster.tech/
-- **Dashboard**: https://dashboard.adster.tech/
+- **Dashboard**: https://app.adster.tech/
 - **Support**: support@adster.tech
 
 ---

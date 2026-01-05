@@ -750,12 +750,6 @@ class AdsterIntegrationServer {
       modified = true;
     }
 
-    // Cleanup legacy API Key if present
-    if (manifest.removeMetaData("com.adstertech.API_KEY")) {
-      logger.success("🗑️ Removed legacy API Key meta-data");
-      modified = true;
-    }
-
     if (modified) {
       await manifest.save(manifestPath);
     } else {

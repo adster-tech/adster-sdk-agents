@@ -254,6 +254,18 @@ class AdsterIntegrationServer {
     const adNetworkName = this.getAdNetworkName(config.adNetwork);
     results.push(`🚀 Starting Adster Custom Adapter integration for ${adNetworkName}...\n`);
 
+    // 0. Ensure mavenCentral() is added to project-level build.gradle
+    const projectBuildGradlePath = join(projectPath, "build.gradle");
+    const projectBuildGradleKtsPath = projectBuildGradlePath + ".kts";
+
+    if (existsSync(projectBuildGradlePath)) {
+      const mavenResult = await this.ensureMavenCentral(projectBuildGradlePath, false);
+      results.push(mavenResult);
+    } else if (existsSync(projectBuildGradleKtsPath)) {
+      const mavenResult = await this.ensureMavenCentral(projectBuildGradleKtsPath, true);
+      results.push(mavenResult);
+    }
+
     // 1. Update build.gradle (app level)
     const buildGradlePath = join(projectPath, "app", "build.gradle");
     if (existsSync(buildGradlePath)) {
@@ -443,12 +455,67 @@ class AdsterIntegrationServer {
     return "✅ Added Adster ProGuard rules";
   }
 
+  private async ensureMavenCentral(path: string, isKts: boolean): Promise<string> {
+    let content = await readFile(path, "utf8");
+
+    // Check if mavenCentral() is already present
+    if (content.includes("mavenCentral()")) {
+      return "✅ mavenCentral() already present in repositories";
+    }
+
+    // Try to add mavenCentral() to repositories block
+    const repositoriesPattern = /repositories\s*{/;
+
+    if (repositoriesPattern.test(content)) {
+      // Add mavenCentral() at the beginning of the repositories block
+      content = content.replace(
+        repositoriesPattern,
+        `repositories {\n        mavenCentral()`
+      );
+      await writeFile(path, content, "utf8");
+      return "✅ Added mavenCentral() to repositories";
+    } else {
+      // If no repositories block found, look for allprojects or other common patterns
+      const allProjectsPattern = /allprojects\s*{/;
+
+      if (allProjectsPattern.test(content)) {
+        // Add repositories block inside allprojects
+        content = content.replace(
+          allProjectsPattern,
+          `allprojects {\n    repositories {\n        mavenCentral()\n    }`
+        );
+        await writeFile(path, content, "utf8");
+        return "✅ Added repositories block with mavenCentral()";
+      } else {
+        return "⚠️  Could not find repositories block - please add mavenCentral() manually to your repositories";
+      }
+    }
+  }
+
   private async validateIntegration(projectPath: string): Promise<string> {
     const results: string[] = [];
     results.push("🔍 Validating Adster Custom Adapter integration...\n");
 
     let score = 0;
-    const maxScore = 4;
+    const maxScore = 5;
+
+    // Check project-level build.gradle for mavenCentral()
+    const projectBuildGradlePath = join(projectPath, "build.gradle");
+    const projectBuildGradleKtsPath = projectBuildGradlePath + ".kts";
+
+    let projectGradleContent = "";
+    if (existsSync(projectBuildGradlePath)) {
+      projectGradleContent = await readFile(projectBuildGradlePath, "utf8");
+    } else if (existsSync(projectBuildGradleKtsPath)) {
+      projectGradleContent = await readFile(projectBuildGradleKtsPath, "utf8");
+    }
+
+    if (projectGradleContent.includes("mavenCentral()")) {
+      results.push("✅ mavenCentral() repository found");
+      score++;
+    } else {
+      results.push("❌ mavenCentral() repository not found in project build.gradle");
+    }
 
     // Check build.gradle
     const buildGradlePath = join(projectPath, "app", "build.gradle");

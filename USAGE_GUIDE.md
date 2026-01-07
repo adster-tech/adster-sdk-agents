@@ -21,6 +21,11 @@ cd ~/AndroidStudioProjects/MyApp
 cp -r /Users/adster/Desktop/Github/adster-mcp-server/.claude .
 ```
 
+> ℹ️ **Codex CLI**: For Codex sessions, also copy the `.codex` folder so the prompts are available locally:
+> ```bash
+> cp -r /Users/adster/Desktop/Github/adster-mcp-server/.codex .
+> ```
+
 ### Step 2: Open Project in Claude Code
 
 ```bash
@@ -69,6 +74,13 @@ The agent will:
 3. Add ProGuard rules
 4. Provide instructions for configuring Adster in your mediation dashboard
 5. Guide you through using your ad network's standard APIs
+
+### Using the Same Agents with Codex CLI
+
+1. Copy both `.claude` and `.codex` directories into your Android project (or run the installer with `--client=codex`).
+2. From the project root, launch Codex with `codex`.
+3. Use the same `@adster-custom-adapter-integrator` or `@adster-android-integrator` prompts—the commands and workflow are identical to Claude Code.
+4. When you're done, keep the `.codex` folder with your project so future Codex sessions can reuse the agents.
 
 ---
 

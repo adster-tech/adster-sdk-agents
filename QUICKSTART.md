@@ -91,6 +91,11 @@ cp -r .claude /path/to/your/android/project/
 
 # In Claude Code, use:
 @adster-custom-adapter-integrator integrate Adster Custom Adapter for AdMob
+
+# For Codex CLI sessions, also copy:
+cp -r .codex /path/to/your/android/project/
+
+# Then run `codex` inside that project and use the same agent prompts.
 ```
 
 ## Need Help?

@@ -1,6 +1,6 @@
-# Adster SDK Agents for Claude Code
+# Adster SDK Agents for Claude Code & Codex
 
-AI-powered Android SDK integration agents for Claude Code. Integrate Adster Custom Adapter or Adster Orchestration SDK into your Android apps in minutes.
+AI-powered Android SDK integration agents for Claude Code and Codex CLI. Integrate Adster Custom Adapter or Adster Orchestration SDK into your Android apps in minutes.
 
 ## Quick Start
 
@@ -10,7 +10,9 @@ Install Adster agents with one command:
 bash <(curl -fsSL https://raw.githubusercontent.com/adster-tech/adster-sdk-agents/main/scripts/install.sh)
 ```
 
-Then in your Android project:
+Add `--client=codex` to install Codex CLI agents or `--client=both` for both IDEs.
+
+Then in your Android project (inside Claude Code or Codex CLI):
 
 ```
 Use @adster-custom-adapter-integrator to integrate Adster for AdMob
@@ -18,7 +20,7 @@ Use @adster-custom-adapter-integrator to integrate Adster for AdMob
 
 ## Overview
 
-This repository provides Claude Code agents that automate Adster SDK integration into Android applications. Choose between:
+This repository provides Claude Code and Codex CLI agents that automate Adster SDK integration into Android applications. Choose between:
 
 1. **Custom Adapter** (Recommended): Integrate Adster as a mediation partner with GAM, AdMob, AppLovin MAX, or IronSource LevelPlay
 2. **Direct SDK** (Legacy): Full control with direct Adster Orchestration SDK integration
@@ -42,6 +44,7 @@ This repository provides Claude Code agents that automate Adster SDK integration
 ## Prerequisites
 
 - Claude Code installed ([Download here](https://claude.com/claude-code))
+- Codex CLI installed (optional, install from [github.com/openai/codex](https://github.com/openai/codex))
 - Android development environment
 - curl (for installation)
 
@@ -49,7 +52,7 @@ This repository provides Claude Code agents that automate Adster SDK integration
 
 ### Option 1: One-Line Install (Recommended)
 
-Install agents globally for all your projects:
+Install agents globally for all your projects (use `--client=codex` or `--client=both` for Codex support):
 
 ```bash
 bash <(curl -fsSL https://raw.githubusercontent.com/adster-tech/adster-sdk-agents/main/scripts/install.sh)
@@ -57,7 +60,7 @@ bash <(curl -fsSL https://raw.githubusercontent.com/adster-tech/adster-sdk-agent
 
 ### Option 2: Local Project Install
 
-Install agents only for the current project:
+Install agents only for the current project (add `--client=codex` or `--client=both` if needed):
 
 ```bash
 bash <(curl -fsSL https://raw.githubusercontent.com/adster-tech/adster-sdk-agents/main/scripts/install.sh) --local
@@ -73,11 +76,23 @@ cd adster-sdk-agents
 
 # Copy agents to Claude Code directory
 cp -r .claude/agents/android ~/.claude/agents/
+
+# Copy agents to Codex CLI directory (optional)
+cp -r .codex/agents/android ~/.codex/agents/
 ```
 
 ## Usage
 
-After installation, navigate to your Android project and use the agents with Claude Code.
+After installation, navigate to your Android project and use the agents inside Claude Code or Codex CLI.
+
+### Codex CLI Usage
+
+1. Install the agents with `--client=codex` (or `--client=both` if you also use Claude Code).
+2. Run `codex` from your Android project directory.
+3. Use the same prompts as Claude Code, for example:
+   ```
+   Use @adster-custom-adapter-integrator to integrate Adster for AdMob
+   ```
 
 ### Custom Adapter Integration (Recommended)
 
@@ -176,9 +191,10 @@ The Direct SDK agent automatically:
    cd /path/to/your/android/project
    ```
 
-3. **Launch Claude Code**:
+3. **Launch Claude Code or Codex CLI**:
    ```bash
-   claude
+   claude   # Claude Code
+   codex    # Codex CLI
    ```
 
 4. **Use the agent**:
@@ -198,7 +214,7 @@ The Direct SDK agent automatically:
 ✅ **Seamless Integration**: Works with existing mediation setup
 ✅ **Dashboard Configured**: Set up in your mediation platform
 ✅ **Automatic Serving**: Adster participates in mediation automatically
-✅ **AI-Powered**: Claude handles the integration complexity
+✅ **AI-Powered**: Claude Code or Codex CLI handles the integration complexity
 ✅ **Multi-Network Support**: Works with GAM, AdMob, AppLovin, IronSource
 
 ### Direct SDK Benefits
@@ -207,7 +223,7 @@ The Direct SDK agent automatically:
 ✅ **All Ad Formats**: Banner, interstitial, rewarded, native
 ✅ **Code Examples**: Ready-to-use implementation snippets
 ✅ **Best Practices**: Built-in guidance for optimal integration
-✅ **AI-Assisted**: Claude writes and explains the code
+✅ **AI-Assisted**: Claude Code or Codex CLI writes and explains the code
 
 ## Troubleshooting
 
@@ -217,7 +233,8 @@ If Claude Code doesn't recognize the agents:
 
 1. **Verify installation**:
    ```bash
-   ls -la ~/.claude/agents/android/
+   ls -la ~/.claude/agents/android/   # Claude Code
+   ls -la ~/.codex/agents/android/    # Codex CLI
    ```
    You should see `adster-custom-adapter-integrator.md` and `adster-android-integrator.md`
 
@@ -226,7 +243,7 @@ If Claude Code doesn't recognize the agents:
    bash <(curl -fsSL https://raw.githubusercontent.com/adster-tech/adster-sdk-agents/main/scripts/install.sh)
    ```
 
-3. **Restart Claude Code**
+3. **Restart Claude Code or start a fresh Codex CLI session**
 
 ### Agent Integration Issues
 
@@ -244,13 +261,14 @@ If the installation script fails:
 1. **Check curl**: Ensure curl is installed (`curl --version`)
 2. **Check network**: Verify you can access GitHub
 3. **Manual install**: Clone the repo and copy agents manually
-4. **Check permissions**: Ensure you have write access to `~/.claude/agents/`
+4. **Check permissions**: Ensure you have write access to `~/.claude/agents/` and `~/.codex/agents/`
 
 ## Documentation & Resources
 
 - **Custom Adapter Documentation**: https://ca-docs.adster.tech/
 - **Adster Dashboard**: https://dashboard.adster.tech/ (Get your API keys and Zone IDs)
 - **Claude Code**: https://claude.com/claude-code
+- **Codex CLI**: https://github.com/openai/codex
 - **Support Email**: support@adster.tech
 
 ## Repository Structure
@@ -258,6 +276,11 @@ If the installation script fails:
 ```
 adster-sdk-agents/
 ├── .claude/
+│   └── agents/
+│       └── android/
+│           ├── adster-custom-adapter-integrator.md
+│           └── adster-android-integrator.md
+├── .codex/
 │   └── agents/
 │       └── android/
 │           ├── adster-custom-adapter-integrator.md
@@ -275,7 +298,7 @@ Contributions are welcome! To contribute:
 1. Fork the repository
 2. Create a feature branch (`git checkout -b feature/amazing-feature`)
 3. Make your changes to the agent files
-4. Test the agents with Claude Code
+4. Test the agents with Claude Code or Codex CLI
 5. Submit a Pull Request
 
 ### Testing Agents Locally
@@ -283,11 +306,15 @@ Contributions are welcome! To contribute:
 To test agent changes before submitting:
 
 ```bash
-# Copy agents to your local Claude directory
+# Copy agents to your local Claude Code directory
 cp .claude/agents/android/*.md ~/.claude/agents/android/
 
-# Use them in Claude Code
+# Copy agents to your local Codex CLI directory (optional)
+cp .codex/agents/android/*.md ~/.codex/agents/android/
+
+# Use them in your IDE of choice
 claude
+codex
 ```
 
 ## License
@@ -300,9 +327,11 @@ MIT License - see [LICENSE](LICENSE) file for details
 - **Email**: support@adster.tech
 - **Documentation**: https://ca-docs.adster.tech/
 
-## About Claude Code
+## About Claude Code & Codex
 
 Claude Code is an AI-powered development assistant by Anthropic that helps you write, understand, and improve code. Learn more at https://claude.com/claude-code
+
+Codex CLI is OpenAI's command-line coding environment powered by GPT-5 Codex, providing the same MCP and agent integrations directly from your terminal. Learn more at https://github.com/openai/codex
 
 ---
 

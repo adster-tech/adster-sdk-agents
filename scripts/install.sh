@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # Adster SDK Agents Installer
-# Installs Claude Code agents for Adster Android SDK integration
+# Installs Claude Code and Codex CLI agents for Adster Android SDK integration
 
 set -e
 
@@ -21,6 +21,7 @@ BASE_URL="https://raw.githubusercontent.com/${REPO_OWNER}/${REPO_NAME}/${BRANCH}
 # Default configuration
 INSTALL_SCOPE="global"
 PLATFORM="android"
+TARGET_CLIENT="claude"
 NON_INTERACTIVE=false
 
 # Detect CI environment
@@ -56,9 +57,13 @@ while [[ $# -gt 0 ]]; do
             INSTALL_SOURCE="${1#*=}"
             shift
             ;;
+        --client=*)
+            TARGET_CLIENT="${1#*=}"
+            shift
+            ;;
         *)
             echo -e "${RED}Unknown option: $1${NC}"
-            echo "Usage: $0 [--global|--local] [--source=remote|local] [--platform=android|all] [--branch=main]"
+            echo "Usage: $0 [--global|--local] [--source=remote|local] [--platform=android|all] [--branch=main] [--client=claude|codex|both]"
             exit 1
             ;;
     esac
@@ -67,8 +72,36 @@ done
 # Default to remote if not specified
 INSTALL_SOURCE=${INSTALL_SOURCE:-remote}
 
+declare -a TARGET_CLIENTS
+case "$TARGET_CLIENT" in
+    claude)
+        TARGET_CLIENTS=("claude")
+        ;;
+    codex)
+        TARGET_CLIENTS=("codex")
+        ;;
+    both)
+        TARGET_CLIENTS=("claude" "codex")
+        ;;
+    *)
+        echo -e "${RED}Invalid client specified: ${TARGET_CLIENT}${NC}"
+        echo "Valid values for --client: claude, codex, both"
+        exit 1
+        ;;
+esac
+
+INSTALL_CLAUDE=false
+INSTALL_CODEX=false
+for client in "${TARGET_CLIENTS[@]}"; do
+    if [ "$client" = "claude" ]; then
+        INSTALL_CLAUDE=true
+    elif [ "$client" = "codex" ]; then
+        INSTALL_CODEX=true
+    fi
+done
+
 echo -e "${BLUE}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
-echo -e "${GREEN}   Adster SDK Agents Installer for Claude Code${NC}"
+echo -e "${GREEN}   Adster SDK Agents Installer for Claude Code & Codex${NC}"
 echo -e "${BLUE}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
 echo ""
 
@@ -86,29 +119,48 @@ if [ "$INSTALL_SOURCE" = "remote" ]; then
     echo -e "${GREEN}✓${NC} curl is available"
 fi
 
-# Check for Claude Code
-CLAUDE_INSTALLED=false
-if command -v claude &> /dev/null; then
-    CLAUDE_INSTALLED=true
-    echo -e "${GREEN}✓${NC} Claude Code CLI is installed"
-elif [ -d "$HOME/.claude" ]; then
-    CLAUDE_INSTALLED=true
-    echo -e "${GREEN}✓${NC} Claude Code directory found"
-else
-    echo -e "${YELLOW}⚠${NC}  Claude Code not detected (optional)"
-    echo "   Install from: https://claude.com/claude-code"
+if $INSTALL_CLAUDE; then
+    if command -v claude &> /dev/null; then
+        echo -e "${GREEN}✓${NC} Claude Code CLI is installed"
+    elif [ -d "$HOME/.claude" ]; then
+        echo -e "${GREEN}✓${NC} Claude Code directory found"
+    else
+        echo -e "${YELLOW}⚠${NC}  Claude Code not detected (optional)"
+        echo "   Install from: https://claude.com/claude-code"
+    fi
+fi
+
+if $INSTALL_CODEX; then
+    if command -v codex &> /dev/null; then
+        echo -e "${GREEN}✓${NC} Codex CLI is installed"
+    elif [ -d "$HOME/.codex" ]; then
+        echo -e "${GREEN}✓${NC} Codex configuration directory found"
+    else
+        echo -e "${YELLOW}⚠${NC}  Codex CLI not detected (optional)"
+        echo "   Install from: https://github.com/openai/codex"
+    fi
 fi
 
 echo ""
 
-# Determine installation directory
+# Determine installation directory per client
+declare -A INSTALL_DIRS
+declare -A CLIENT_LABELS=(["claude"]="Claude Code" ["codex"]="Codex CLI")
+
 if [ "$INSTALL_SCOPE" = "global" ]; then
-    INSTALL_DIR="$HOME/.claude/agents"
-    echo -e "${BLUE}Installation scope:${NC} Global (${INSTALL_DIR})"
+    INSTALL_DIRS["claude"]="$HOME/.claude/agents"
+    INSTALL_DIRS["codex"]="$HOME/.codex/agents"
+    echo -e "${BLUE}Installation scope:${NC} Global"
 else
-    INSTALL_DIR=".claude/agents"
-    echo -e "${BLUE}Installation scope:${NC} Local project (${INSTALL_DIR})"
+    INSTALL_DIRS["claude"]=".claude/agents"
+    INSTALL_DIRS["codex"]=".codex/agents"
+    echo -e "${BLUE}Installation scope:${NC} Local project"
 fi
+
+for client in "${TARGET_CLIENTS[@]}"; do
+    dir="${INSTALL_DIRS[$client]}"
+    echo -e "  - ${CLIENT_LABELS[$client]} → ${dir}"
+done
 
 echo -e "${BLUE}Install source:${NC}     ${INSTALL_SOURCE}"
 echo -e "${BLUE}Platform:${NC}           ${PLATFORM}"
@@ -130,51 +182,70 @@ if [ ${#AGENTS[@]} -eq 0 ]; then
     exit 1
 fi
 
-# Create installation directory
-mkdir -p "${INSTALL_DIR}/android"
+# Create installation directories
+for client in "${TARGET_CLIENTS[@]}"; do
+    mkdir -p "${INSTALL_DIRS[$client]}/android"
+done
 
 # Download and install agents
 echo -e "${YELLOW}Installing agents...${NC}"
 echo ""
 
-INSTALLED_COUNT=0
-FAILED_COUNT=0
+declare -A INSTALLED_COUNT
+declare -A FAILED_COUNT
+for client in "${TARGET_CLIENTS[@]}"; do
+    INSTALLED_COUNT[$client]=0
+    FAILED_COUNT[$client]=0
+done
 
 REPO_ROOT=$(pwd)
 
-for agent in "${AGENTS[@]}"; do
-    agent_name=$(basename "$agent")
-    platform_dir=$(dirname "$agent")
-    dest="${INSTALL_DIR}/${agent}"
-    
-    echo -n "  Installing ${agent_name}... "
+for client in "${TARGET_CLIENTS[@]}"; do
+    install_dir="${INSTALL_DIRS[$client]}"
+    client_label="${CLIENT_LABELS[$client]}"
+    local_base="${REPO_ROOT}/.${client}/agents"
+    remote_base="${BASE_URL}/.${client}/agents"
 
-    if [ "$INSTALL_SOURCE" = "local" ]; then
-        local_src="${REPO_ROOT}/.claude/agents/${agent}"
-        if [ -f "$local_src" ]; then
-            cp "$local_src" "$dest"
-            echo -e "${GREEN}✓ (local)${NC}"
-            ((INSTALLED_COUNT++))
+    echo -e "${BLUE}${client_label}:${NC} Installing to ${install_dir}"
+
+    for agent in "${AGENTS[@]}"; do
+        agent_name=$(basename "$agent")
+        dest="${install_dir}/${agent}"
+        mkdir -p "$(dirname "$dest")"
+
+        echo -n "  Installing ${agent_name}... "
+
+        if [ "$INSTALL_SOURCE" = "local" ]; then
+            local_src="${local_base}/${agent}"
+            if [ -f "$local_src" ]; then
+                cp "$local_src" "$dest"
+                echo -e "${GREEN}✓ (local)${NC}"
+                INSTALLED_COUNT[$client]=$(( ${INSTALLED_COUNT[$client]} + 1 ))
+            else
+                echo -e "${RED}✗ (file not found: $local_src)${NC}"
+                FAILED_COUNT[$client]=$(( ${FAILED_COUNT[$client]} + 1 ))
+            fi
         else
-            echo -e "${RED}✗ (file not found: $local_src)${NC}"
-            ((FAILED_COUNT++))
+            url="${remote_base}/${agent}"
+            if curl -fsSL "$url" -o "$dest" 2>/dev/null; then
+                echo -e "${GREEN}✓${NC}"
+                INSTALLED_COUNT[$client]=$(( ${INSTALLED_COUNT[$client]} + 1 ))
+            else
+                echo -e "${RED}✗ (download failed)${NC}"
+                FAILED_COUNT[$client]=$(( ${FAILED_COUNT[$client]} + 1 ))
+            fi
         fi
-    else
-        url="${BASE_URL}/.claude/agents/${agent}"
-        if curl -fsSL "$url" -o "$dest" 2>/dev/null; then
-            echo -e "${GREEN}✓${NC}"
-            ((INSTALLED_COUNT++))
-        else
-            echo -e "${RED}✗ (download failed)${NC}"
-            ((FAILED_COUNT++))
-        fi
-    fi
+    done
+    echo ""
 done
 
-echo ""
-
 # Installation summary
-if [ $FAILED_COUNT -eq 0 ]; then
+total_failed=0
+for client in "${TARGET_CLIENTS[@]}"; do
+    total_failed=$(( total_failed + ${FAILED_COUNT[$client]} ))
+done
+
+if [ $total_failed -eq 0 ]; then
     echo -e "${GREEN}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
     echo -e "${GREEN}   ✓ Installation Complete!${NC}"
     echo -e "${GREEN}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
@@ -185,10 +256,9 @@ else
 fi
 
 echo ""
-echo -e "${BLUE}Installed agents:${NC} ${INSTALLED_COUNT}"
-if [ $FAILED_COUNT -gt 0 ]; then
-    echo -e "${RED}Failed:${NC} ${FAILED_COUNT}"
-fi
+for client in "${TARGET_CLIENTS[@]}"; do
+    echo -e "${BLUE}${CLIENT_LABELS[$client]}:${NC} Installed ${INSTALLED_COUNT[$client]}, Failed ${FAILED_COUNT[$client]}"
+done
 echo ""
 
 # Show installed agents
@@ -211,15 +281,30 @@ echo ""
 echo "1. Navigate to your Android project directory:"
 echo -e "   ${YELLOW}cd /path/to/your/android/project${NC}"
 echo ""
-echo "2. Launch Claude Code:"
-echo -e "   ${YELLOW}claude${NC}"
-echo ""
-echo "3. Use an agent (Custom Adapter recommended):"
-echo -e "   ${YELLOW}Use @adster-custom-adapter-integrator to integrate Adster for AdMob${NC}"
-echo ""
-echo "   Or for legacy direct SDK integration:"
-echo -e "   ${YELLOW}Use @adster-android-integrator to integrate Adster SDK${NC}"
-echo ""
+
+if $INSTALL_CLAUDE; then
+    echo -e "${BLUE}Claude Code:${NC}"
+    echo "2. Launch Claude Code:"
+    echo -e "   ${YELLOW}claude${NC}"
+    echo ""
+    echo "3. Use an agent (Custom Adapter recommended):"
+    echo -e "   ${YELLOW}Use @adster-custom-adapter-integrator to integrate Adster for AdMob${NC}"
+    echo ""
+    echo "   Or for legacy direct SDK integration:"
+    echo -e "   ${YELLOW}Use @adster-android-integrator to integrate Adster SDK${NC}"
+    echo ""
+fi
+
+if $INSTALL_CODEX; then
+    echo -e "${BLUE}Codex CLI:${NC}"
+    echo "2. Launch Codex:"
+    echo -e "   ${YELLOW}codex${NC}"
+    echo ""
+    echo "3. Use the same agent commands:"
+    echo -e "   ${YELLOW}Use @adster-custom-adapter-integrator to integrate Adster for AdMob${NC}"
+    echo -e "   ${YELLOW}Use @adster-android-integrator to integrate Adster SDK${NC}"
+    echo ""
+fi
 
 if [ "$INSTALL_SCOPE" = "local" ]; then
     echo -e "${BLUE}Note:${NC} Agents installed locally in this project only"

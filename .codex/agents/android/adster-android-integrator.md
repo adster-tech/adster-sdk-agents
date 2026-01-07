@@ -136,26 +136,19 @@ public class MyApplication extends Application {
 
 ### Step 6: Provide Implementation Examples
 
-After integration, provide the user with implementation examples for different ad formats using the correct `AdSterAdLoader` pattern:
+After integration, provide the user with implementation examples for different ad formats using the correct `AdSterAdLoader` pattern.
 
-#### Banner Ad Implementation
+#### Banner Ad Implementation (Kotlin)
 
-**Kotlin:**
 ```kotlin
-// Import the following classes (packages may vary):
-// AdRequestConfiguration, AdSterAdLoader, MediationAdListener, MediationBannerAd, AdError
-
 class MainActivity : AppCompatActivity() {
     
     private fun loadBanner() {
-        // Create configuration
         val config = AdRequestConfiguration.Builder(this, "YOUR_PLACEMENT_ID").build()
         
-        // Load Ad
-        AdSterAdLoader.Companion.builder()
+        AdSterAdLoader.builder()
             .withAdsListener(object : MediationAdListener {
                 override fun onBannerAdLoaded(ad: MediationBannerAd) {
-                    // Add banner view to your layout
                     val container = findViewById<ViewGroup>(R.id.banner_container)
                     container.removeAllViews()
                     container.addView(ad.view)
@@ -164,8 +157,6 @@ class MainActivity : AppCompatActivity() {
                 override fun onFailure(error: AdError) {
                     Log.e("Adster", "Banner failed: ${error.message}")
                 }
-                
-                // Implement other required methods...
             })
             .build()
             .loadAd(config)
@@ -173,30 +164,23 @@ class MainActivity : AppCompatActivity() {
 }
 ```
 
-#### Interstitial Ad Implementation
+#### Interstitial Ad Implementation (Kotlin)
 
-**Kotlin:**
 ```kotlin
-// Import the following classes (packages may vary):
-// AdRequestConfiguration, AdSterAdLoader, MediationAdListener, MediationInterstitialAd, AdError
-
 class MainActivity : AppCompatActivity() {
 
     private fun loadInterstitial() {
         val config = AdRequestConfiguration.Builder(this, "YOUR_PLACEMENT_ID").build()
         
-        AdSterAdLoader.Companion.builder()
+        AdSterAdLoader.builder()
             .withAdsListener(object : MediationAdListener {
                 override fun onInterstitialAdLoaded(ad: MediationInterstitialAd) {
-                    // Show when ready
                     ad.showAd(this@MainActivity)
                 }
 
                 override fun onFailure(error: AdError) {
                     Log.e("Adster", "Interstitial failed: ${error.message}")
                 }
-                
-                // Implement other required methods...
             })
             .build()
             .loadAd(config)
@@ -204,49 +188,74 @@ class MainActivity : AppCompatActivity() {
 }
 ```
 
+#### Rewarded Ad Implementation (Kotlin)
+
+```kotlin
+class MainActivity : AppCompatActivity() {
+
+    private fun loadRewarded() {
+        val config = AdRequestConfiguration.Builder(this, "YOUR_PLACEMENT_ID").build()
+        
+        AdSterAdLoader.builder()
+            .withAdsListener(object : MediationAdListener {
+                override fun onRewardedAdLoaded(ad: MediationRewardedAd) {
+                    ad.showAd(this@MainActivity) { rewardItem ->
+                        Log.d("Adster", "User rewarded: ${rewardItem.amount}")
+                    }
+                }
+
+                override fun onFailure(error: AdError) {
+                    Log.e("Adster", "Rewarded failed: ${error.message}")
+                }
+            })
+            .build()
+            .loadAd(config)
+    }
+}
+```
+
+#### Native Ad Implementation (Kotlin)
+
+```kotlin
+class MainActivity : AppCompatActivity() {
+
+    private fun loadNative() {
+        val config = AdRequestConfiguration.Builder(this, "YOUR_PLACEMENT_ID")
+            .withAdFormat(AdFormat.NATIVE)
+            .build()
+        
+        AdSterAdLoader.builder()
+            .withAdsListener(object : MediationAdListener {
+                override fun onNativeAdLoaded(ad: MediationNativeAd) {
+                    val nativeView = layoutInflater.inflate(R.layout.adster_native_layout, null) as NativeAdView
+                    nativeView.setNativeAd(ad)
+                    val container = findViewById<ViewGroup>(R.id.native_container)
+                    container.removeAllViews()
+                    container.addView(nativeView)
+                }
+
+                override fun onFailure(error: AdError) {
+                    Log.e("Adster", "Native failed: ${error.message}")
+                }
+            })
+            .build()
+            .loadAd(config)
+    }
+}
+```
+
+### Step 7: Testing Checklist
+
+Remind the user to:
+1. Test each ad format with their Placement IDs
+2. Verify permissions in AndroidManifest.xml
+3. Ensure ProGuard rules are applied in release builds
+4. Implement fallback logic if ad fails to load
+
 ---
 
-## Integration Report Template
+## Support & Resources
 
-After completing integration, provide a summary:
-
-### Files Modified
-- `app/build.gradle` - Added Adster Orchestration SDK dependency
-- `app/src/main/AndroidManifest.xml` - Added permissions
-- `app/proguard-rules.pro` - Added ProGuard rules
-- `app/src/main/java/.../MyApplication.kt` - Initialized SDK
-
-### Integration Details
-- **SDK Type**: Adster Orchestration SDK (Direct Integration)
-- **Dependency**: com.adstertech:orchestrationsdk
-- **Initialization**: Application class
-
-### Next Steps
-1. ✅ Sync Gradle files
-2. ✅ Retrieve your **Placement IDs** from the Adster Dashboard (replace `YOUR_PLACEMENT_ID`)
-3. ✅ Implement ad loading code using the samples provided
-4. ✅ Test your integration
-
-### Support
-- **Documentation**: https://docs.adster.tech/
-- **Dashboard**: https://app.adster.tech/
-- **Support**: support@adster.tech
-
----
-
-## Best Practices
-
-1. **Use Placement IDs**: Always use valid placement IDs from the dashboard
-2. **Lifecycle Management**: Destroy ads when activity is destroyed
-3. **Error Handling**: Implement all listener methods for robustness
-
-## Common Issues & Solutions
-
-**Issue**: Clean build fails
-- **Solution**: Check internet connection and Maven Central accessibility
-
-**Issue**: Ads not loading
-- **Solution**: Verify Placement ID is correct and permissions are granted
-
-**Issue**: Class not found
-- **Solution**: Ensure you are using `com.adster.core` imports as shown in examples
+- Adster Dashboard: https://dashboard.adster.tech/
+- Documentation: https://ca-docs.adster.tech/
+- Support: support@adster.tech

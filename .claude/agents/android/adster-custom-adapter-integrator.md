@@ -88,8 +88,8 @@ If `app/proguard-rules.pro` exists, add Adster ProGuard rules:
 
 ```proguard
 # Adster Custom Adapter
--keep class com.adstertech.** { *; }
--dontwarn com.adstertech.**
+-keep class com.adster.sdk.** { *; }
+-dontwarn com.adster.sdk.**
 ```
 
 If the file doesn't exist and the project uses ProGuard/R8, create the file and add these rules.
@@ -105,10 +105,10 @@ After completing the file modifications, provide the user with platform-specific
    - Create a new custom event named "Adster"
 
 2. **Configure Class Names:**
-   - **Banner**: `com.adstertech.customadapter.AdsterCustomEventBanner`
-   - **Interstitial**: `com.adstertech.customadapter.AdsterCustomEventInterstitial`
-   - **Rewarded**: `com.adstertech.customadapter.AdsterCustomEventRewarded`
-   - **Native**: `com.adstertech.customadapter.AdsterCustomEventNative`
+   - **Banner**: `com.adster.ads.mediation.adapter.AdSterMediationAdapter`
+   - **Interstitial**: `com.adster.ads.mediation.adapter.AdSterMediationAdapter`
+   - **Rewarded**: `com.adster.ads.mediation.adapter.AdSterMediationAdapter`
+   - **Native**: `com.adster.ads.mediation.adapter.AdSterMediationAdapter`
 
 3. **Set Parameter**: Add your Adster Placement ID in the parameter field
 
@@ -121,10 +121,10 @@ After completing the file modifications, provide the user with platform-specific
    - Add "Adster" as a custom event
 
 2. **Configure Class Names:**
-   - **Banner**: `com.adstertech.customadapter.AdsterCustomEventBanner`
-   - **Interstitial**: `com.adstertech.customadapter.AdsterCustomEventInterstitial`
-   - **Rewarded**: `com.adstertech.customadapter.AdsterCustomEventRewarded`
-   - **Native**: `com.adstertech.customadapter.AdsterCustomEventNative`
+   - **Banner**: `com.adster.ads.mediation.adapter.AdSterMediationAdapter`
+   - **Interstitial**: `com.adster.ads.mediation.adapter.AdSterMediationAdapter`
+   - **Rewarded**: `com.adster.ads.mediation.adapter.AdSterMediationAdapter`
+   - **Native**: `com.adster.ads.mediation.adapter.AdSterMediationAdapter`
 
 3. **Set Parameter**: Add your Adster Placement ID in the parameter field
 
@@ -138,7 +138,7 @@ After completing the file modifications, provide the user with platform-specific
 
 2. **Configure Adapter:**
    - **Network Name**: Adster
-   - **Android Adapter Class**: `com.adstertech.customadapter.applovin.AdsterMediationAdapter`
+   - **Android Adapter Class**: `com.adster.ads.mediation.applovin.AdSterMediationAdapter`
 
 3. **Add to Waterfall**: Include Adster in your ad unit waterfalls
 

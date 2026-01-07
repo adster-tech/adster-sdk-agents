@@ -87,9 +87,9 @@ If `app/proguard-rules.pro` exists, add Adster ProGuard rules:
 
 ```proguard
 # Adster Orchestration SDK
--keep class com.adstertech.** { *; }
--keep interface com.adstertech.** { *; }
--dontwarn com.adstertech.**
+-keep class com.adster.sdk.** { *; }
+-keep interface com.adster.sdk.** { *; }
+-dontwarn com.adster.sdk.**
 ```
 
 ### Step 5: Initialize SDK in Application Class
@@ -99,14 +99,14 @@ Guide the user to initialize the SDK in their Application class:
 **Kotlin:**
 ```kotlin
 import android.app.Application
-import com.adstertech.orchestration.AdsterSDK
+import com.adster.sdk.mediation.AdSter
 
 class MyApplication : Application() {
     override fun onCreate() {
         super.onCreate()
 
         // Initialize Adster SDK
-        AdsterSDK.initialize(this)
+        AdSter.initializeSdk(this)
     }
 }
 ```
@@ -114,7 +114,7 @@ class MyApplication : Application() {
 **Java:**
 ```java
 import android.app.Application;
-import com.adstertech.orchestration.AdsterSDK;
+import com.adster.sdk.mediation.AdSter;
 
 public class MyApplication extends Application {
     @Override
@@ -122,7 +122,7 @@ public class MyApplication extends Application {
         super.onCreate();
 
         // Initialize Adster SDK
-        AdsterSDK.initialize(this);
+        AdSter.INSTANCE.initializeSdk(this);
     }
 }
 ```

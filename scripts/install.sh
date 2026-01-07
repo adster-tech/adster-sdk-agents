@@ -144,22 +144,25 @@ fi
 echo ""
 
 # Determine installation directory per client
-declare -A INSTALL_DIRS
-declare -A CLIENT_LABELS=(["claude"]="Claude Code" ["codex"]="Codex CLI")
+INSTALL_DIR_CLAUDE=""
+INSTALL_DIR_CODEX=""
 
 if [ "$INSTALL_SCOPE" = "global" ]; then
-    INSTALL_DIRS["claude"]="$HOME/.claude/agents"
-    INSTALL_DIRS["codex"]="$HOME/.codex/agents"
+    INSTALL_DIR_CLAUDE="$HOME/.claude/agents"
+    INSTALL_DIR_CODEX="$HOME/.codex/agents"
     echo -e "${BLUE}Installation scope:${NC} Global"
 else
-    INSTALL_DIRS["claude"]=".claude/agents"
-    INSTALL_DIRS["codex"]=".codex/agents"
+    INSTALL_DIR_CLAUDE=".claude/agents"
+    INSTALL_DIR_CODEX=".codex/agents"
     echo -e "${BLUE}Installation scope:${NC} Local project"
 fi
 
 for client in "${TARGET_CLIENTS[@]}"; do
-    dir="${INSTALL_DIRS[$client]}"
-    echo -e "  - ${CLIENT_LABELS[$client]} → ${dir}"
+    if [ "$client" = "claude" ]; then
+        echo -e "  - Claude Code → ${INSTALL_DIR_CLAUDE}"
+    else
+        echo -e "  - Codex CLI → ${INSTALL_DIR_CODEX}"
+    fi
 done
 
 echo -e "${BLUE}Install source:${NC}     ${INSTALL_SOURCE}"
@@ -184,27 +187,36 @@ fi
 
 # Create installation directories
 for client in "${TARGET_CLIENTS[@]}"; do
-    mkdir -p "${INSTALL_DIRS[$client]}/android"
+    if [ "$client" = "claude" ]; then
+        mkdir -p "${INSTALL_DIR_CLAUDE}/android"
+    else
+        mkdir -p "${INSTALL_DIR_CODEX}/android"
+    fi
 done
 
 # Download and install agents
 echo -e "${YELLOW}Installing agents...${NC}"
 echo ""
 
-declare -A INSTALLED_COUNT
-declare -A FAILED_COUNT
-for client in "${TARGET_CLIENTS[@]}"; do
-    INSTALLED_COUNT[$client]=0
-    FAILED_COUNT[$client]=0
-done
+INSTALLED_COUNT_CLAUDE=0
+FAILED_COUNT_CLAUDE=0
+INSTALLED_COUNT_CODEX=0
+FAILED_COUNT_CODEX=0
 
 REPO_ROOT=$(pwd)
 
 for client in "${TARGET_CLIENTS[@]}"; do
-    install_dir="${INSTALL_DIRS[$client]}"
-    client_label="${CLIENT_LABELS[$client]}"
-    local_base="${REPO_ROOT}/.${client}/agents"
-    remote_base="${BASE_URL}/.${client}/agents"
+    if [ "$client" = "claude" ]; then
+        install_dir="${INSTALL_DIR_CLAUDE}"
+        client_label="Claude Code"
+        local_base="${REPO_ROOT}/.claude/agents"
+        remote_base="${BASE_URL}/.claude/agents"
+    else
+        install_dir="${INSTALL_DIR_CODEX}"
+        client_label="Codex CLI"
+        local_base="${REPO_ROOT}/.codex/agents"
+        remote_base="${BASE_URL}/.codex/agents"
+    fi
 
     echo -e "${BLUE}${client_label}:${NC} Installing to ${install_dir}"
 
@@ -220,19 +232,35 @@ for client in "${TARGET_CLIENTS[@]}"; do
             if [ -f "$local_src" ]; then
                 cp "$local_src" "$dest"
                 echo -e "${GREEN}✓ (local)${NC}"
-                INSTALLED_COUNT[$client]=$(( ${INSTALLED_COUNT[$client]} + 1 ))
+                if [ "$client" = "claude" ]; then
+                    INSTALLED_COUNT_CLAUDE=$(( INSTALLED_COUNT_CLAUDE + 1 ))
+                else
+                    INSTALLED_COUNT_CODEX=$(( INSTALLED_COUNT_CODEX + 1 ))
+                fi
             else
                 echo -e "${RED}✗ (file not found: $local_src)${NC}"
-                FAILED_COUNT[$client]=$(( ${FAILED_COUNT[$client]} + 1 ))
+                if [ "$client" = "claude" ]; then
+                    FAILED_COUNT_CLAUDE=$(( FAILED_COUNT_CLAUDE + 1 ))
+                else
+                    FAILED_COUNT_CODEX=$(( FAILED_COUNT_CODEX + 1 ))
+                fi
             fi
         else
             url="${remote_base}/${agent}"
             if curl -fsSL "$url" -o "$dest" 2>/dev/null; then
                 echo -e "${GREEN}✓${NC}"
-                INSTALLED_COUNT[$client]=$(( ${INSTALLED_COUNT[$client]} + 1 ))
+                if [ "$client" = "claude" ]; then
+                    INSTALLED_COUNT_CLAUDE=$(( INSTALLED_COUNT_CLAUDE + 1 ))
+                else
+                    INSTALLED_COUNT_CODEX=$(( INSTALLED_COUNT_CODEX + 1 ))
+                fi
             else
                 echo -e "${RED}✗ (download failed)${NC}"
-                FAILED_COUNT[$client]=$(( ${FAILED_COUNT[$client]} + 1 ))
+                if [ "$client" = "claude" ]; then
+                    FAILED_COUNT_CLAUDE=$(( FAILED_COUNT_CLAUDE + 1 ))
+                else
+                    FAILED_COUNT_CODEX=$(( FAILED_COUNT_CODEX + 1 ))
+                fi
             fi
         fi
     done
@@ -240,10 +268,7 @@ for client in "${TARGET_CLIENTS[@]}"; do
 done
 
 # Installation summary
-total_failed=0
-for client in "${TARGET_CLIENTS[@]}"; do
-    total_failed=$(( total_failed + ${FAILED_COUNT[$client]} ))
-done
+total_failed=$((FAILED_COUNT_CLAUDE + FAILED_COUNT_CODEX))
 
 if [ $total_failed -eq 0 ]; then
     echo -e "${GREEN}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
@@ -257,7 +282,11 @@ fi
 
 echo ""
 for client in "${TARGET_CLIENTS[@]}"; do
-    echo -e "${BLUE}${CLIENT_LABELS[$client]}:${NC} Installed ${INSTALLED_COUNT[$client]}, Failed ${FAILED_COUNT[$client]}"
+    if [ "$client" = "claude" ]; then
+        echo -e "${BLUE}Claude Code:${NC} Installed ${INSTALLED_COUNT_CLAUDE}, Failed ${FAILED_COUNT_CLAUDE}"
+    else
+        echo -e "${BLUE}Codex CLI:${NC} Installed ${INSTALLED_COUNT_CODEX}, Failed ${FAILED_COUNT_CODEX}"
+    fi
 done
 echo ""
 

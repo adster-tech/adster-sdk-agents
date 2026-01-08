@@ -44,7 +44,32 @@ Ask the user which mediation network they're using:
 
 If not specified, default to **AdMob** and inform the user.
 
-### Step 3: Add Gradle Dependency
+### Step 3: Configure Repositories
+
+Ensure `mavenCentral()` is included in your repositories configuration.
+
+**For modern projects (`settings.gradle` or `settings.gradle.kts`):**
+```gradle
+dependencyResolutionManagement {
+    repositoriesMode.set(RepositoriesMode.FAIL_ON_PROJECT_REPOS)
+    repositories {
+        google()
+        mavenCentral() // Ensure this is present
+    }
+}
+```
+
+**For older projects (project-level `build.gradle`):**
+```gradle
+allprojects {
+    repositories {
+        google()
+        mavenCentral()
+    }
+}
+```
+
+### Step 4: Add Gradle Dependency
 
 Update `app/build.gradle` or `app/build.gradle.kts`:
 
@@ -71,7 +96,7 @@ dependencies {
 
 **Important**: Add the dependency in the `dependencies` block. If the user requests a specific version, use that version instead.
 
-### Step 4: Add Manifest Permissions
+### Step 5: Add Manifest Permissions
 
 Update `app/src/main/AndroidManifest.xml` to include required permissions:
 
@@ -82,7 +107,7 @@ Update `app/src/main/AndroidManifest.xml` to include required permissions:
 
 Only add these permissions if they don't already exist in the manifest.
 
-### Step 5: Configure ProGuard Rules
+### Step 6: Configure ProGuard Rules
 
 If `app/proguard-rules.pro` exists, add Adster ProGuard rules:
 
@@ -94,7 +119,7 @@ If `app/proguard-rules.pro` exists, add Adster ProGuard rules:
 
 If the file doesn't exist and the project uses ProGuard/R8, create the file and add these rules.
 
-### Step 6: Provide Dashboard Configuration Instructions
+### Step 7: Provide Dashboard Configuration Instructions
 
 After completing the file modifications, provide the user with platform-specific dashboard configuration instructions:
 
@@ -154,7 +179,7 @@ After completing the file modifications, provide the user with platform-specific
 
 4. **Full documentation**: https://ca-docs.adster.tech/ironsource
 
-### Step 7: Remind the User
+### Step 8: Remind the User
 
 After integration, remind the user to:
 1. Sync Gradle files

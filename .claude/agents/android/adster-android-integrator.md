@@ -37,7 +37,31 @@ Before starting integration, verify the Android project structure:
 - app/src/main/java or app/src/main/kotlin (source code directory)
 ```
 
-### Step 2: Add Gradle Dependencies
+### Step 2: Configure Repositories
+Ensure `mavenCentral()` is included in your repositories configuration.
+
+**For modern projects (`settings.gradle` or `settings.gradle.kts`):**
+```gradle
+dependencyResolutionManagement {
+    repositoriesMode.set(RepositoriesMode.FAIL_ON_PROJECT_REPOS)
+    repositories {
+        google()
+        mavenCentral() // Ensure this is present
+    }
+}
+```
+
+**For older projects (project-level `build.gradle`):**
+```gradle
+allprojects {
+    repositories {
+        google()
+        mavenCentral()
+    }
+}
+```
+
+### Step 3: Add Gradle Dependencies
 
 Update `app/build.gradle` or `app/build.gradle.kts`:
 
@@ -61,7 +85,7 @@ dependencies {
 
 **Note**: The `+` notation fetches the latest version. Users can specify a specific version if needed.
 
-### Step 3: Add Manifest Permissions
+### Step 4: Add Manifest Permissions
 
 Update `app/src/main/AndroidManifest.xml`:
 
@@ -81,7 +105,7 @@ Update `app/src/main/AndroidManifest.xml`:
 
 **Note**: Do NOT add any `meta-data` for API Key. It is not required.
 
-### Step 4: Configure ProGuard Rules
+### Step 5: Configure ProGuard Rules
 
 If `app/proguard-rules.pro` exists, add Adster ProGuard rules:
 
@@ -92,7 +116,7 @@ If `app/proguard-rules.pro` exists, add Adster ProGuard rules:
 -dontwarn com.adster.sdk.**
 ```
 
-### Step 5: Initialize SDK in Application Class
+### Step 6: Initialize SDK in Application Class
 
 Guide the user to initialize the SDK in their Application class:
 
@@ -134,7 +158,7 @@ public class MyApplication extends Application {
     ...>
 ```
 
-### Step 6: Provide Implementation Examples
+### Step 7: Provide Implementation Examples
 
 After integration, provide the user with implementation examples for different ad formats using the correct `AdSterAdLoader` pattern:
 
@@ -249,4 +273,4 @@ After completing integration, provide a summary:
 - **Solution**: Verify Placement ID is correct and permissions are granted
 
 **Issue**: Class not found
-- **Solution**: Ensure you are using `com.adster.core` imports as shown in examples
+- **Solution**: Ensure you are using `com.adster.sdk` imports as shown in examples

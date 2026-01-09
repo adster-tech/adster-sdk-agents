@@ -1,13 +1,13 @@
 ---
-name: adster-custom-adapter-integrator
-description: Integrates Adster Custom Adapter into iOS projects with automatic configuration for AdMob, AppLovin MAX, or IronSource LevelPlay mediation
+name: adster-ios-ca-integrator
+description: Integrates Adster Custom Adapter into iOS projects with automatic configuration for GAM or AdMob mediation
 tools: Read, Write, Edit, Bash, Glob, Grep
 model: sonnet
 ---
 
 # Adster Custom Adapter Integrator (iOS)
 
-**Version**: Latest stable (CocoaPods/SPM)
+**Version**: 1.2.9 (CocoaPods/SPM)
 **Last Updated**: January 2025
 
 ## IMPORTANT: User-Facing Guidelines
@@ -38,9 +38,8 @@ If any required files are missing, inform the user and halt integration.
 ### Step 2: Determine Ad Network
 
 Ask the user which mediation network they're using:
+- **Google Ad Manager (GAM)**
 - **AdMob**
-- **AppLovin MAX**
-- **IronSource LevelPlay**
 
 If not specified, default to **AdMob** and inform the user.
 
@@ -58,19 +57,9 @@ If not specified, default to **CocoaPods** and inform the user.
 
 Update `Podfile`:
 
-**For AdMob:**
+**For GAM or AdMob:**
 ```ruby
-pod 'AdsterMediationAdapter-AdMob', '~> 1.0.0'
-```
-
-**For AppLovin MAX:**
-```ruby
-pod 'AdsterMediationAdapter-AppLovin', '~> 1.0.0'
-```
-
-**For IronSource LevelPlay:**
-```ruby
-pod 'AdsterMediationAdapter-IronSource', '~> 1.0.0'
+pod 'Adster', '~> 1.2.9'
 ```
 
 Then run:
@@ -83,12 +72,11 @@ pod install --repo-update
 #### Option B: Swift Package Manager (SPM)
 
 1. In Xcode: **File > Add Package Dependencies**
-2. Add the appropriate repository:
-   - **AdMob**: `https://github.com/adster-tech/mediation-adapter-ios-admob`
-   - **AppLovin MAX**: `https://github.com/adster-tech/mediation-adapter-ios-applovin`
-   - **IronSource**: `https://github.com/adster-tech/mediation-adapter-ios-ironsource`
-3. Select "Up to Next Major Version"
+2. Add the repository URL: `https://github.com/adster-tech/orchestration-sdk-ios`
+3. Select version **1.2.9** or "Up to Next Major Version"
 4. Add to your target
+
+**Note**: The same SDK package is used for both GAM and AdMob integrations.
 
 ### Step 5: Configure Info.plist
 
@@ -129,6 +117,22 @@ If your mediation network requires SKAdNetwork IDs, add them to `Info.plist`:
 
 After completing the file modifications, provide the user with platform-specific dashboard configuration instructions:
 
+#### For Google Ad Manager (GAM):
+
+1. **Create Custom Event in GAM:**
+   - Navigate to **Delivery > Custom Events**
+   - Create a new custom event named "Adster"
+
+2. **Configure Class Names:**
+   - **Banner**: `AdsFramework.AdSterMediationCustomEvent`
+   - **Interstitial**: `AdsFramework.AdSterMediationCustomEvent`
+   - **Rewarded**: `AdsFramework.AdSterMediationCustomEvent`
+   - **Native**: `AdsFramework.AdSterMediationCustomEvent`
+
+3. **Set Parameter**: Add your Adster Placement ID in the parameter field
+
+4. **Full documentation**: https://ca-docs.adster.tech/google-ad-manager
+
 #### For AdMob:
 
 1. **Create Custom Event in AdMob:**
@@ -137,41 +141,14 @@ After completing the file modifications, provide the user with platform-specific
    - Add Adster as a **Custom Event**
 
 2. **Configure Class Names:**
-   - **Banner**: `AdsterMediationAdapter.AdsterBannerAdapter`
-   - **Interstitial**: `AdsterMediationAdapter.AdsterInterstitialAdapter`
-   - **Rewarded**: `AdsterMediationAdapter.AdsterRewardedAdapter`
-   - **Native**: `AdsterMediationAdapter.AdsterNativeAdapter`
+   - **Banner**: `AdsFramework.AdSterMediationCustomEvent`
+   - **Interstitial**: `AdsFramework.AdSterMediationCustomEvent`
+   - **Rewarded**: `AdsFramework.AdSterMediationCustomEvent`
+   - **Native**: `AdsFramework.AdSterMediationCustomEvent`
 
 3. **Parameter**: Add your Adster Placement ID in the parameter field
 
 4. **Full documentation**: https://ca-docs.adster.tech/admob-ios
-
-#### For AppLovin MAX:
-
-1. **Create Custom Network:**
-   - Go to **MAX > Mediation > Networks**
-   - Click **Manage Networks** and add a **Custom Network**
-
-2. **Set Class Names:**
-   - **Banner**: `AdsterMediationAdapter.AdsterBannerAdapter`
-   - **Interstitial**: `AdsterMediationAdapter.AdsterInterstitialAdapter`
-   - **Rewarded**: `AdsterMediationAdapter.AdsterRewardedAdapter`
-
-3. **Custom Parameters**: Use the Adster Placement ID
-
-4. **Full documentation**: https://ca-docs.adster.tech/applovin-ios
-
-#### For IronSource LevelPlay:
-
-1. **Create Custom Adapter:**
-   - Go to **Monetize > Custom Adapters**
-   - Create a new adapter for Adster
-
-2. **Class Name**: `AdsterMediationAdapter.AdsterIronSourceAdapter`
-
-3. **Custom Network Settings**: Add Placement ID parameter
-
-4. **Full documentation**: https://ca-docs.adster.tech/ironsource-ios
 
 ---
 
@@ -185,10 +162,10 @@ After completing integration, provide a summary using this template:
 - `.xcworkspace` - Updated (if using CocoaPods)
 
 ### Integration Details
-- **Ad Network**: [AdMob/AppLovin/IronSource]
-- **Adapter Version**: [version number]
+- **Ad Network**: [GAM/AdMob]
+- **Adapter Version**: 1.2.9
 - **Dependency Manager**: [CocoaPods/SPM]
-- **Custom Adapter Package**: [package name]
+- **Custom Adapter Package**: Adster (CocoaPods) or orchestration-sdk-ios (SPM)
 
 ### Next Steps
 1. ✅ Run `pod install` (if using CocoaPods) or resolve SPM packages

@@ -175,14 +175,14 @@ declare -a AGENTS
 
 if [ "$PLATFORM" = "android" ] || [ "$PLATFORM" = "all" ]; then
     AGENTS+=(
-        "android/adster-custom-adapter-integrator.md"
+        "android/adster-android-ca-integrator.md"
         "android/adster-android-integrator.md"
     )
 fi
 
 if [ "$PLATFORM" = "ios" ] || [ "$PLATFORM" = "all" ]; then
     AGENTS+=(
-        "ios/adster-custom-adapter-integrator.md"
+        "ios/adster-ios-ca-integrator.md"
         "ios/adster-ios-integrator.md"
     )
 fi
@@ -303,10 +303,13 @@ echo ""
 # Show installed agents
 echo -e "${YELLOW}Available Agents:${NC}"
 echo ""
-echo -e "  ${GREEN}@adster-custom-adapter-integrator${NC}"
-echo -e "    Integrate Adster as a mediation partner"
-echo -e "    Android: GAM, AdMob, AppLovin MAX, IronSource"
-echo -e "    iOS: AdMob, AppLovin MAX, IronSource"
+echo -e "  ${GREEN}@adster-android-ca-integrator${NC}"
+echo -e "    Integrate Adster Custom Adapter for Android"
+echo -e "    Works with: GAM, AdMob, AppLovin MAX, IronSource"
+echo ""
+echo -e "  ${GREEN}@adster-ios-ca-integrator${NC}"
+echo -e "    Integrate Adster Custom Adapter for iOS"
+echo -e "    Works with: GAM, AdMob"
 echo ""
 echo -e "  ${GREEN}@adster-android-integrator${NC}"
 echo -e "    Direct Android SDK integration (legacy)"
@@ -322,8 +325,8 @@ echo -e "${BLUE}━━━━━━━━━━━━━━━━━━━━━�
 echo -e "${GREEN}   Next Steps${NC}"
 echo -e "${BLUE}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
 echo ""
-echo "1. Navigate to your Android project directory:"
-echo -e "   ${YELLOW}cd /path/to/your/android/project${NC}"
+echo "1. Navigate to your project directory:"
+echo -e "   ${YELLOW}cd /path/to/your/project${NC}"
 echo ""
 
 if $INSTALL_CLAUDE; then
@@ -332,10 +335,20 @@ if $INSTALL_CLAUDE; then
     echo -e "   ${YELLOW}claude${NC}"
     echo ""
     echo "3. Use an agent (Custom Adapter recommended):"
-    echo -e "   ${YELLOW}Use @adster-custom-adapter-integrator to integrate Adster for AdMob${NC}"
+    if [ "$PLATFORM" = "android" ] || [ "$PLATFORM" = "all" ]; then
+        echo -e "   ${YELLOW}Use @adster-android-ca-integrator for Android mediation${NC}"
+    fi
+    if [ "$PLATFORM" = "ios" ] || [ "$PLATFORM" = "all" ]; then
+        echo -e "   ${YELLOW}Use @adster-ios-ca-integrator for iOS mediation${NC}"
+    fi
     echo ""
     echo "   Or for legacy direct SDK integration:"
-    echo -e "   ${YELLOW}Use @adster-android-integrator to integrate Adster SDK${NC}"
+    if [ "$PLATFORM" = "android" ] || [ "$PLATFORM" = "all" ]; then
+        echo -e "   ${YELLOW}Use @adster-android-integrator for Android SDK${NC}"
+    fi
+    if [ "$PLATFORM" = "ios" ] || [ "$PLATFORM" = "all" ]; then
+        echo -e "   ${YELLOW}Use @adster-ios-integrator for iOS SDK${NC}"
+    fi
     echo ""
 fi
 
@@ -345,8 +358,14 @@ if $INSTALL_CODEX; then
     echo -e "   ${YELLOW}codex${NC}"
     echo ""
     echo "3. Use the same agent commands:"
-    echo -e "   ${YELLOW}Use @adster-custom-adapter-integrator to integrate Adster for AdMob${NC}"
-    echo -e "   ${YELLOW}Use @adster-android-integrator to integrate Adster SDK${NC}"
+    if [ "$PLATFORM" = "android" ] || [ "$PLATFORM" = "all" ]; then
+        echo -e "   ${YELLOW}Use @adster-android-ca-integrator for Android mediation${NC}"
+        echo -e "   ${YELLOW}Use @adster-android-integrator for Android SDK${NC}"
+    fi
+    if [ "$PLATFORM" = "ios" ] || [ "$PLATFORM" = "all" ]; then
+        echo -e "   ${YELLOW}Use @adster-ios-ca-integrator for iOS mediation${NC}"
+        echo -e "   ${YELLOW}Use @adster-ios-integrator for iOS SDK${NC}"
+    fi
     echo ""
 fi
 

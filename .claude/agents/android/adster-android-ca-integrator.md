@@ -1,8 +1,8 @@
 ---
-name: adster-custom-adapter-integrator
+name: adster-android-ca-integrator
 description: Integrates Adster Custom Adapter into Android projects with automatic configuration for GAM, AdMob, AppLovin MAX, or IronSource LevelPlay
 tools: Read, Write, Edit, Bash, Glob, Grep
-model: gpt-5-codex
+model: sonnet
 ---
 
 # Adster Custom Adapter Integrator
@@ -143,54 +143,113 @@ After completing the file modifications, provide the user with platform-specific
 
 1. **Create Custom Event in AdMob:**
    - Navigate to **Mediation > Create Mediation Group**
-   - Choose the ad format you want (banner, interstitial, rewarded, native)
-   - Add Adster as a **Custom Event**
+   - Add "Adster" as a custom event
 
-2. **Class Name**: `com.adster.ads.mediation.adapter.AdSterMediationAdapter`
+2. **Configure Class Names:**
+   - **Banner**: `com.adster.ads.mediation.adapter.AdSterMediationAdapter`
+   - **Interstitial**: `com.adster.ads.mediation.adapter.AdSterMediationAdapter`
+   - **Rewarded**: `com.adster.ads.mediation.adapter.AdSterMediationAdapter`
+   - **Native**: `com.adster.ads.mediation.adapter.AdSterMediationAdapter`
 
-3. **Parameter**: Add your Adster Placement ID
+3. **Set Parameter**: Add your Adster Placement ID in the parameter field
 
 4. **Full documentation**: https://ca-docs.adster.tech/admob
 
 #### For AppLovin MAX:
 
-1. **Create Custom Network:**
-   - Go to **MAX > Mediation > Networks**
-   - Click **Manage Networks** and add a **Custom Network**
+1. **Create Custom Network in AppLovin:**
+   - Navigate to **MAX > Mediation > Manage > Networks**
+   - Click "Create Custom Network"
 
-2. **Set Class Names:**
-   - **Banner**: `com.adster.ads.applovin.AdSterMediationAdapter`
-   - **Interstitial**: `com.adster.ads.applovin.AdSterMediationAdapter`
-   - **Rewarded**: `com.adster.ads.applovin.AdSterMediationAdapter`
+2. **Configure Adapter:**
+   - **Network Name**: Adster
+   - **Android Adapter Class**: `com.adster.ads.mediation.applovin.AdSterMediationAdapter`
 
-3. **Custom Parameters**: Use the Adster Placement ID
+3. **Add to Waterfall**: Include Adster in your ad unit waterfalls
 
 4. **Full documentation**: https://ca-docs.adster.tech/applovin
 
 #### For IronSource LevelPlay:
 
-1. **Create Custom Adapter:**
-   - Go to **Monetize > Custom Adapters**
-   - Create a new adapter for Adster
+1. **Create Custom Adapter in IronSource:**
+   - Navigate to **SDK Networks**
+   - Add "Adster" as a custom adapter
 
-2. **Class Name**: `com.adster.ads.ironsource.AdSterMediationAdapter`
+2. **Configure Adapter:**
+   - **Banner**: `com.adstertech.customadapter.ironsource.AdsterCustomBanner`
+   - **Interstitial**: `com.adstertech.customadapter.ironsource.AdsterCustomInterstitial`
+   - **Rewarded**: `com.adstertech.customadapter.ironsource.AdsterCustomRewardedVideo`
 
-3. **Custom Network Settings**: Add Placement ID parameter
+3. **Set Instance Parameters**: Add your Adster Placement ID
 
 4. **Full documentation**: https://ca-docs.adster.tech/ironsource
 
-### Step 8: Remind the User
+---
 
-After integration, remind the user to:
-1. Sync Gradle files
-2. Configure Adster in their mediation dashboard
-3. Obtain Placement IDs from https://dashboard.adster.tech/
+## Integration Report Template
+
+After completing integration, provide a summary using this template:
+
+### Files Modified
+- `app/build.gradle` - Added Adster Custom Adapter dependency
+- `app/src/main/AndroidManifest.xml` - Added required permissions
+- `app/proguard-rules.pro` - Added ProGuard rules (if applicable)
+
+### Integration Details
+- **Ad Network**: [GAM/AdMob/AppLovin/IronSource]
+- **Adapter Version**: [version number]
+- **Custom Adapter Package**: com.adstertech:customadapter-[variant]:[version]
+
+### Next Steps
+1. ✅ Sync Gradle files
+2. ✅ Configure Adster in your [platform] dashboard using the instructions above
+3. ✅ Test your integration by requesting ads through your existing mediation code
+4. ✅ No additional code changes needed!
+
+### Support
+- **Documentation**: https://ca-docs.adster.tech/
+- **Dashboard**: https://dashboard.adster.tech/
+- **Support**: support@adster.tech
 
 ---
 
-## Troubleshooting Tips
+## Best Practices
 
-- If dependencies fail to sync, check Gradle version compatibility
-- Ensure `google()` and `mavenCentral()` repositories are present
-- Confirm the mediation SDK is already in the project
-- Use `./gradlew clean` if builds fail after integration
+1. **Always use the latest stable version** unless the user specifies otherwise
+2. **Verify ProGuard configuration** if the app uses code shrinking
+3. **Preserve existing dependencies** - only add Adster, don't modify others
+4. **Check for conflicts** with existing Adster dependencies before adding
+5. **Validate Gradle syntax** based on whether it's Groovy (.gradle) or Kotlin (.gradle.kts)
+6. **Inform users about dashboard configuration** - this is critical for the adapter to work
+
+## Testing Checklist
+
+Before marking integration as complete, verify:
+- [ ] Gradle dependency added correctly
+- [ ] AndroidManifest.xml permissions added
+- [ ] ProGuard rules added (if applicable)
+- [ ] Integration report provided to user
+- [ ] Dashboard configuration instructions provided
+- [ ] User informed about Gradle sync requirement
+
+## Common Issues & Solutions
+
+**Issue**: Gradle sync fails after adding dependency
+- **Solution**: Verify the version number is correct and Maven Central is accessible
+
+**Issue**: ProGuard rules file doesn't exist
+- **Solution**: Create the file only if the project uses minifyEnabled true in build.gradle
+
+**Issue**: User doesn't know their Adster Placement ID
+- **Solution**: Direct them to https://dashboard.adster.tech/ to retrieve their placement IDs
+
+---
+
+## Completion Verification
+
+Before completing the task, ensure:
+1. All required files have been modified
+2. No syntax errors introduced
+3. User has been provided with complete dashboard configuration instructions
+4. User has been informed about next steps (Gradle sync + dashboard config)
+5. Support resources have been shared

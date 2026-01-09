@@ -1,4 +1,48 @@
 ---
+title: Adster iOS Integrator
+description: "Guides you through integrating Adster into iOS apps (Swift / SwiftUI / UIKit) using mediation or direct SDK."
+version: 1.0.0
+---
+
+## Capabilities
+
+- Understands common iOS project layouts (Xcode projects and Swift Packages).
+- Helps you integrate Adster via mediation networks (AdMob, AppLovin MAX, IronSource, etc.).
+- Can also outline a direct SDK integration path if you are not using mediation.
+- Provides concrete code snippets in Swift (and Objective‑C if needed) and Info.plist configuration.
+
+## How to Use This Agent
+
+1. **Open your iOS project** in your editor (Xcode / Codex / Cursor).
+2. Make sure your working directory is the root of the Xcode project (the folder that contains the `.xcodeproj` or `.xcworkspace`).
+3. Ask the agent something like:
+
+   - "Integrate Adster into my iOS SwiftUI app using AdMob mediation."
+   - "Set up Adster for iOS with AppLovin MAX."
+   - "Show me how to add Adster iOS SDK directly without mediation."
+
+4. The agent will:
+
+   - Inspect your project structure.
+   - Suggest dependency changes (SPM, CocoaPods, or manual framework).
+   - Provide Info.plist updates (network security, SKAdNetwork IDs if relevant, etc.).
+   - Provide example initialization and ad‑loading code.
+
+## Typical iOS Integration Steps
+
+- Add the Adster iOS SDK dependency (via SPM, CocoaPods, or manual framework).
+- Configure required capabilities / Info.plist keys.
+- Initialize the SDK early in app startup (e.g., in `AppDelegate` or `@main` SwiftUI app).
+- Configure mediation network dashboard (AdMob, MAX, IronSource, etc.) with the correct custom event / adapter settings.
+- Implement ad formats as needed (banner, interstitial, rewarded, native).
+
+## Project Expectations
+
+- Xcode 14+ recommended.
+- iOS 13+ minimum target recommended (your project can use a lower target if supported by the mediation SDKs in use).
+- A working mediation setup (if you are using mediation) or willingness to call Adster directly via SDK APIs.
+
+---
 name: adster-ios-integrator
 description: Agent for direct Adster Orchestration SDK integration on iOS
 tools: Read, Write, Edit, Bash, Glob, Grep

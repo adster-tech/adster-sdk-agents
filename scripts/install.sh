@@ -20,7 +20,8 @@ BASE_URL="https://raw.githubusercontent.com/${REPO_OWNER}/${REPO_NAME}/${BRANCH}
 
 # Default configuration
 INSTALL_SCOPE="global"
-PLATFORM="android"
+# Install all platforms by default so both Android and iOS agents are available
+PLATFORM="all"
 TARGET_CLIENT="claude"
 NON_INTERACTIVE=false
 
@@ -63,7 +64,7 @@ while [[ $# -gt 0 ]]; do
             ;;
         *)
             echo -e "${RED}Unknown option: $1${NC}"
-            echo "Usage: $0 [--global|--local] [--source=remote|local] [--platform=android|all] [--branch=main] [--client=claude|codex|both]"
+            echo "Usage: $0 [--global|--local] [--source=remote|local] [--platform=android|ios|all] [--branch=main] [--client=claude|codex|both]"
             exit 1
             ;;
     esac
@@ -179,18 +180,27 @@ if [ "$PLATFORM" = "android" ] || [ "$PLATFORM" = "all" ]; then
     )
 fi
 
+if [ "$PLATFORM" = "ios" ] || [ "$PLATFORM" = "all" ]; then
+    AGENTS+=(
+        "ios/adster-custom-adapter-integrator.md"
+        "ios/adster-ios-integrator.md"
+    )
+fi
+
 if [ ${#AGENTS[@]} -eq 0 ]; then
     echo -e "${RED}❌ No agents selected for installation${NC}"
-    echo "Valid platforms: android, all"
+    echo "Valid platforms: android, ios, all"
     exit 1
 fi
 
-# Create installation directories
+# Create installation directories (always create both android and ios directories for consistency)
 for client in "${TARGET_CLIENTS[@]}"; do
     if [ "$client" = "claude" ]; then
         mkdir -p "${INSTALL_DIR_CLAUDE}/android"
+        mkdir -p "${INSTALL_DIR_CLAUDE}/ios"
     else
         mkdir -p "${INSTALL_DIR_CODEX}/android"
+        mkdir -p "${INSTALL_DIR_CODEX}/ios"
     fi
 done
 
@@ -295,10 +305,15 @@ echo -e "${YELLOW}Available Agents:${NC}"
 echo ""
 echo -e "  ${GREEN}@adster-custom-adapter-integrator${NC}"
 echo -e "    Integrate Adster as a mediation partner"
-echo -e "    Works with: GAM, AdMob, AppLovin MAX, IronSource"
+echo -e "    Android: GAM, AdMob, AppLovin MAX, IronSource"
+echo -e "    iOS: AdMob, AppLovin MAX, IronSource"
 echo ""
 echo -e "  ${GREEN}@adster-android-integrator${NC}"
-echo -e "    Direct SDK integration (legacy)"
+echo -e "    Direct Android SDK integration (legacy)"
+echo -e "    Full control with all ad formats"
+echo ""
+echo -e "  ${GREEN}@adster-ios-integrator${NC}"
+echo -e "    Direct iOS SDK integration (Swift / SwiftUI / UIKit)"
 echo -e "    Full control with all ad formats"
 echo ""
 
